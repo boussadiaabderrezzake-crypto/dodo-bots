@@ -139,7 +139,7 @@ def analyze_smc(df):
     }
 
 # ==========================================
-# 6. تنفيذ التحليل
+# 6. تنفيذ التحليل + فلتر الجودة
 # ==========================================
 def execute_analysis(symbol, name, source, interval, lot):
     df = fetch_ohlcv(symbol, source, interval)
@@ -153,10 +153,24 @@ def execute_analysis(symbol, name, source, interval, lot):
     quality = res['quality']
     quality_reasons = ", ".join(res['quality_reasons'])
     
+    # فلتر الاتجاه
     if trend == "NEUTRAL":
         send_telegram(f"⏳ *تحليل السوق:* {name}\nالنتيجة: السوق متذبذب، لا توجد إشارة.")
         return {"trend": "NEUTRAL", "price": price}
     
+    # ==========================================
+    # ✅ فلتر الجودة: أقل من 4 نجوم = ما نفتحوش الصفقة
+    # ==========================================
+    if quality < 4:
+        send_telegram(
+            f"⚠️ *تحليل السوق:* {name}\n"
+            f"النتيجة: السوق متذبذب، جودة الإشارة ضعيفة ({quality}/5 ⭐).\n"
+            f"الأسباب: {quality_reasons}\n"
+            f"🚫 *لا تفتح صفقة الآن.*"
+        )
+        return {"trend": "NEUTRAL", "price": price, "quality": quality}
+    
+    # الصفقة مقبولة
     if trend == "BULLISH":
         sl = price - 5.0
         tp1, tp2, tp3, tp4 = price + 5.0, price + 10.0, price + 15.0, price + 20.0
@@ -420,24 +434,22 @@ with col_right:
                 manage_trades()
                 st.success("✅ تم تحديث الصفقات!")
 
-        # ==========================================
-        # عرض نتيجة آخر تحليل (بالأهداف كاملة)
-        # ==========================================
+        # عرض نتيجة آخر تحليل
         if st.session_state.last_analysis:
             res = st.session_state.last_analysis
             if "error" in res:
                 st.error(res["error"])
             elif res["trend"] == "NEUTRAL":
                 st.warning(f"⚠️ السوق متذبذب.\nالسعر: `{res['price']:.2f}`")
+                if res.get("quality"):
+                    st.caption(f"جودة الإشارة: {res['quality']}/5 ⭐ (ضعيفة، لم تُفتح صفقة)")
             else:
                 st.success(f"✅ تم التحليل وإرسال الإشارة!")
                 
-                # نجوم الجودة
                 stars = "⭐" * res.get('quality', 0) + "☆" * (5 - res.get('quality', 0))
                 st.write(f"**جودة الصفقة:** {stars} ({res.get('quality',0)}/5)")
                 st.caption(f"📝 {res.get('quality_reasons','')}")
                 
-                # معلومات أساسية
                 st.markdown(f"""
                 <div style="background-color:#1e1e1e; border:1px solid #444; border-radius:8px; padding:10px; margin-top:10px;">
                     <p style="color:#aaa; margin:0; font-size:13px;">الاتجاه</p>
@@ -445,7 +457,6 @@ with col_right:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # السعر واللوت والستوب
                 c_a, c_b, c_c = st.columns(3)
                 with c_a:
                     st.markdown(f"""
@@ -469,9 +480,6 @@ with col_right:
                     </div>
                     """, unsafe_allow_html=True)
                 
-                # ==========================================
-                # الأهداف الأربعة (في سطرين)
-                # ==========================================
                 st.markdown("**🎯 الأهداف (TP1 → TP4):**")
                 tp_c1, tp_c2 = st.columns(2)
                 with tp_c1:
