@@ -1,215 +1,349 @@
-import subprocess
-import sys
-
-# تثبيت المكتبات تلقائياً
-subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "yfinance", "pandas"])
-
+import streamlit as st
 import requests
-import time
-import yfinance as yf
 import pandas as pd
+import numpy as np
+import yfinance as yf
+import datetime
+import pytz
+import streamlit.components.v1 as components
 
-TOKEN = "9206676062:AAH8_U0dY7UDCbJFQiNvoJ0p3EjmOf-ZzwI"
-CHAT_ID = "-1003911614530"
-CAPITAL = 1000
-RISK_PERCENT = 1.0
+# ==========================================
+# 1. الإعدادات والسرية
+# ==========================================
+st.set_page_config(page_title="SMART TRADING AI", layout="wide", initial_sidebar_state="expanded")
 
-open_trades = {}
-daily_alerts_sent = {}
+TOKEN = st.secrets.get("TELEGRAM_TOKEN")
+CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID")
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD")
 
-def send_telegram(msg):
+if not TOKEN or not CHAT_ID:
+    st.error("❌ التوكن أو الـ ID غير موجودين في Secrets!")
+    st.stop()
+
+def send_telegram(msg: str):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
+    payload = {"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"}
+    try:
+        requests.post(url, data=payload, timeout=10)
+    except Exception as e:
+        pass
 
-def analyze_smc(df):
-    if df is None or len(df) < 20:
+# ==========================================
+# 2. حالة التطبيق
+# ==========================================
+if "open_trades" not in st.session_state:
+    st.session_state.open_trades = {}
+open_trades = st.session_state.open_trades
+
+if "last_analysis" not in st.session_state:
+    st.session_state.last_analysis = None
+
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+
+# ==========================================
+# 3. جلب البيانات
+# ==========================================
+def fetch_ohlcv(symbol, source, interval="5m"):
+    try:
+        if source == "metal":
+            df = yf.Ticker("GC=F").history(period="5d", interval=interval)
+            if df.empty: return None
+            df = df.rename(columns={"Open":"open","High":"high","Low":"low","Close":"close","Volume":"volume"})
+            return df.tail(300)
+        elif source == "crypto":
+            binance_int = interval.replace("d", "1d").replace("h", "1h").replace("m", "m")
+            r = requests.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={binance_int}&limit=300", timeout=10)
+            if r.status_code != 200: return None
+            raw = r.json()
+            df = pd.DataFrame(raw, columns=["time","open","high","low","close","volume","ct","qav","trades","tb","tq","ig"])
+            for c in ["open","high","low","close","volume"]: df[c] = df[c].astype(float)
+            return df
+        else:
+            df = yf.Ticker(symbol).history(period="5d", interval=interval)
+            if df.empty: return None
+            df = df.rename(columns={"Open":"open","High":"high","Low":"low","Close":"close","Volume":"volume"})
+            return df.tail(300)
+    except Exception as e:
         return None
-    current_price = df['close'].iloc[-1]
-    last_high = df['high'].tail(10).max()
-    last_low = df['low'].tail(10).min()
-    if current_price > last_high:
-        direction = "UP"
-    elif current_price < last_low:
-        direction = "DOWN"
+
+# ==========================================
+# 4. جلب السعر (gold-api فقط - آمن)
+# ==========================================
+def get_current_price(symbol, source):
+    try:
+        if source == "metal":
+            r = requests.get("https://api.gold-api.com/price/XAU", timeout=10)
+            if r.status_code == 200:
+                return float(r.json()['price'])
+        elif source == "crypto":
+            return float(requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}", timeout=10).json()['price'])
+        elif source == "yahoo":
+            df = yf.Ticker(symbol).history(period="1d", interval="1m")
+            if not df.empty: return float(df['Close'].iloc[-1])
+    except Exception as e:
+        return None
+    return None
+
+# ==========================================
+# 5. محرك التحليل
+# ==========================================
+def analyze_smc(df):
+    if df is None or len(df) < 50: return None
+    df['sma50'] = df['close'].rolling(50).mean()
+    df['obv'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
+    df['obv_ma'] = df['obv'].rolling(20).mean()
+    
+    last_close = df['close'].iloc[-1]
+    last_sma50 = df['sma50'].iloc[-1]
+    obv_val = df['obv'].iloc[-1]
+    obv_ma_val = df['obv_ma'].iloc[-1]
+    
+    trend = "NEUTRAL"
+    if last_close > last_sma50 and obv_val > obv_ma_val: trend = "BULLISH"
+    elif last_close < last_sma50 and obv_val < obv_ma_val: trend = "BEARISH"
+    
+    return {"trend": trend, "last_close": last_close, "sma50": last_sma50}
+
+# ==========================================
+# 6. تنفيذ التحليل
+# ==========================================
+def execute_analysis(symbol, name, source, interval):
+    df = fetch_ohlcv(symbol, source, interval)
+    if df is None: return {"error": "لا توجد بيانات."}
+    res = analyze_smc(df)
+    if res is None: return {"error": "فشل التحليل."}
+    
+    live_price = get_current_price(symbol, source)
+    price = live_price if live_price else res['last_close']
+    trend = res['trend']
+    
+    if trend == "NEUTRAL":
+        send_telegram(f"⏳ *تحليل السوق:* {name}\nالنتيجة: السوق متذبذب، لا توجد إشارة.")
+        return {"trend": "NEUTRAL", "price": price}
+    
+    if trend == "BULLISH":
+        sl = price - 5.0
+        tp1, tp2, tp3, tp4 = price + 5.0, price + 10.0, price + 15.0, price + 20.0
+        emoji = "🟢"
     else:
-        direction = "SIDEWAYS"
-    return {"price": current_price, "direction": direction, "high": last_high, "low": last_low}
+        sl = price + 5.0
+        tp1, tp2, tp3, tp4 = price - 5.0, price - 10.0, price - 15.0, price - 20.0
+        emoji = "🔴"
 
-def open_trade(symbol, name, price, direction):
-    risk_usd = (CAPITAL * RISK_PERCENT) / 100
-    distance = 10.0
-    if direction == "UP":
-        entry = price
-        sl = entry - distance
-        tp1 = entry + distance
-        tp2 = entry + (distance * 2)
-        tp3 = entry + (distance * 3)
-        tp4 = entry + (distance * 4)
-        trade_type = "BUY"
-    elif direction == "DOWN":
-        entry = price
-        sl = entry + distance
-        tp1 = entry - distance
-        tp2 = entry - (distance * 2)
-        tp3 = entry - (distance * 3)
-        tp4 = entry - (distance * 4)
-        trade_type = "SELL"
-    else:
-        return
-
-    lot = risk_usd / abs(entry - sl)
-
+    msg = f"🌟 *GOLDRIDER AI (SMC)*\n"
+    msg += f"{emoji} *النوع:* `{trend}` ({name})\n"
+    msg += f"💰 *الدخول:* `{price:.2f}`\n"
+    msg += f"🛑 *الستوب:* `{sl:.2f}` (5$)\n"
+    msg += f"🎯 *TP1:* `{tp1:.2f}` (+5$)\n"
+    msg += f"🎯 *TP2:* `{tp2:.2f}` (+10$)\n"
+    msg += f"🎯 *TP3:* `{tp3:.2f}` (+15$)\n"
+    msg += f"🏆 *TP4:* `{tp4:.2f}` (+20$)\n"
+    send_telegram(msg)
+    
     open_trades[symbol] = {
-        'name': name, 'type': trade_type, 'entry': entry, 'sl': sl,
-        'tp1': tp1, 'tp2': tp2, 'tp3': tp3, 'tp4': tp4, 'lot': lot
+        'name': name, 'type': trend, 'entry': price, 'source': source,
+        'sl_original': sl, 'sl': sl,
+        'tp1': tp1, 'tp2': tp2, 'tp3': tp3, 'tp4': tp4,
+        'tp1_hit': False, 'tp2_hit': False, 'tp3_hit': False, 'tp4_hit': False,
+        'be_set': False
     }
     
-    msg = f"🟢 *فتح صفقة {trade_type} (تجريبي)*\n"
-    msg += f"{name} | سعر الدخول: `{entry:.2f}`\n"
-    msg += f"🛑 وقف الخسارة: `{sl:.2f}` (10$)\n"
-    msg += f"🎯 الهدف 1: `{tp1:.2f}` (10$)\n"
-    msg += f"🎯 الهدف 2: `{tp2:.2f}` (20$)\n"
-    msg += f"🎯 الهدف 3: `{tp3:.2f}` (30$)\n"
-    msg += f"🎯 الهدف 4: `{tp4:.2f}` (40$)\n"
-    msg += f"📦 اللوت: `{lot:.4f}`\n"
-    send_telegram(msg)
-    print(f"Opened {trade_type} for {name} at {entry:.2f}")
+    return {"trend": trend, "price": price, "sl": sl, "tp1": tp1, "tp2": tp2, "tp3": tp3, "tp4": tp4, "emoji": emoji}
 
+# ==========================================
+# 7. إدارة الصفقات
+# ==========================================
 def manage_trades():
-    for symbol, trade in list(open_trades.items()):
-        try:
-            if "USDT" in symbol:
-                coin_id = symbol.replace("USDT", "").lower()
-                url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
-                data = requests.get(url).json()
-                if coin_id in data:
-                    price = data[coin_id]['usd']
-                else:
-                    continue
+    for symbol in list(open_trades.keys()):
+        trade = open_trades[symbol]
+        price = get_current_price(symbol, trade.get('source'))
+        if price is None: continue
+
+        if (trade['type'] == 'BULLISH' and price <= trade['sl']) or (trade['type'] == 'BEARISH' and price >= trade['sl']):
+            reason = "Break-Even" if trade['be_set'] else "الستوب لوز"
+            send_telegram(f"❌ *ضرب {reason}* 🛑\n{trade['name']} ({trade['type']})")
+            del open_trades[symbol]
+            continue
+
+        if trade['type'] == 'BULLISH':
+            if price >= trade['tp4'] and not trade['tp4_hit']:
+                trade['tp4_hit'] = True
+                send_telegram(f"🏆 *تحقق الهدف الرابع (TP4)!*\n{trade['name']} +20$")
+                del open_trades[symbol]; continue
+            elif price >= trade['tp3'] and not trade['tp3_hit']:
+                trade['tp3_hit'] = True
+                send_telegram(f"🎯 *تحقق الهدف الثالث (TP3)!*\n{trade['name']} +15$")
+            elif price >= trade['tp2'] and not trade['tp2_hit']:
+                trade['tp2_hit'] = True
+                send_telegram(f"🎯 *تحقق الهدف الثاني (TP2)!*\n{trade['name']} +10$")
+            elif price >= trade['tp1'] and not trade['tp1_hit']:
+                trade['tp1_hit'] = True
+                trade['sl'] = trade['entry']
+                trade['be_set'] = True
+                send_telegram(f"✅ *تحقق الهدف الأول (TP1) وتأمين!* 🔒\n{trade['name']} +5$")
+        else:
+            if price <= trade['tp4'] and not trade['tp4_hit']:
+                trade['tp4_hit'] = True
+                send_telegram(f"🏆 *تحقق الهدف الرابع (TP4)!*\n{trade['name']} +20$")
+                del open_trades[symbol]; continue
+            elif price <= trade['tp3'] and not trade['tp3_hit']:
+                trade['tp3_hit'] = True
+                send_telegram(f"🎯 *تحقق الهدف الثالث (TP3)!*\n{trade['name']} +15$")
+            elif price <= trade['tp2'] and not trade['tp2_hit']:
+                trade['tp2_hit'] = True
+                send_telegram(f"🎯 *تحقق الهدف الثاني (TP2)!*\n{trade['name']} +10$")
+            elif price <= trade['tp1'] and not trade['tp1_hit']:
+                trade['tp1_hit'] = True
+                trade['sl'] = trade['entry']
+                trade['be_set'] = True
+                send_telegram(f"✅ *تحقق الهدف الأول (TP1) وتأمين!* 🔒\n{trade['name']} +5$")
+
+# ==========================================
+# 8. الواجهة
+# ==========================================
+algeria_tz = pytz.timezone('Africa/Algiers')
+now = datetime.datetime.now(algeria_tz).strftime("%H:%M:%S | %Y-%m-%d")
+
+TELEGRAM_CHANNEL_URL = "https://t.me/+8hruUT1mtE1hMzc0"
+WHATSAPP_URL = "https://wa.me/213667570565"
+
+st.markdown(f"""
+<style>
+    .main-title {{ color: #d4af37; text-align: center; font-size: 40px; font-weight: bold; }}
+    .sub-title {{ color: #00bfff; text-align: center; font-size: 20px; margin-bottom: 5px; }}
+    .time-box {{ text-align: center; color: #aaa; margin-bottom: 20px; font-family: monospace; }}
+    .btn-telegram {{ display: block; width: 100%; text-align: center; padding: 12px; background-color: #0088cc; color: white; font-size: 16px; font-weight: bold; border-radius: 10px; text-decoration: none; margin-bottom: 10px; }}
+    .btn-whatsapp {{ display: block; width: 100%; text-align: center; padding: 12px; background-color: #25D366; color: white; font-size: 16px; font-weight: bold; border-radius: 10px; text-decoration: none; margin-bottom: 20px; }}
+    .vip-card {{ background-color: #1e1e1e; border: 1px solid #d4af37; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 10px; color: white; }}
+    .vip-price {{ color: #d4af37; font-size: 20px; font-weight: bold; }}
+</style>
+<div class="main-title">🌟 SMART TRADING AI 🌟</div>
+<div class="sub-title">GOLDRIDER & RAZAKE TRADING</div>
+<div class="time-box">🇩🇿 توقيت الجزائر: {now}</div>
+<a href="{TELEGRAM_CHANNEL_URL}" target="_blank" class="btn-telegram">📢 طلب الانضمام إلى قناة التليجرام</a>
+<a href="{WHATSAPP_URL}" target="_blank" class="btn-whatsapp">💬 التواصل معنا على واتساب</a>
+""", unsafe_allow_html=True)
+
+st.markdown("### 👑 عروض الاشتراك في قناة VIP")
+vip_plans = [("شهر واحد", "30$"), ("3 أشهر", "90$"), ("6 أشهر", "120$"), ("9 أشهر", "150$"), ("سنة كاملة", "180$")]
+vip_cols = st.columns(5)
+for i, (plan_name, price) in enumerate(vip_plans):
+    with vip_cols[i]:
+        st.markdown(f"""
+        <div class="vip-card">
+            <strong>{plan_name}</strong><br>
+            <span class="vip-price">{price}</span><br>
+            <a href="{WHATSAPP_URL}" target="_blank" style="color:#25D366; font-size:14px;">اشترك الآن</a>
+        </div>
+        """, unsafe_allow_html=True)
+
+st.divider()
+
+markets = {
+    "السلع (Commodities)": {"XAUUSD": "OANDA:XAUUSD", "XAGUSD": "OANDA:XAGUSD", "USOIL": "TVC:USOIL"},
+    "العملات الرقمية (Crypto)": {"BTCUSDT": "BINANCE:BTCUSDT", "ETHUSDT": "BINANCE:ETHUSDT", "SOLUSDT": "BINANCE:SOLUSDT", "BNBUSDT": "BINANCE:BNBUSDT"},
+    "الفوركس (Forex)": {"EURUSD": "FX:EURUSD", "GBPUSD": "FX:GBPUSD", "USDJPY": "FX:USDJPY", "AUDUSD": "FX:AUDUSD"},
+    "الأسهم (Stocks)": {"AAPL": "NASDAQ:AAPL", "TSLA": "NASDAQ:TSLA", "MSFT": "NASDAQ:MSFT", "NVDA": "NASDAQ:NVDA"}
+}
+
+timeframes = {
+    "1 دقيقة": "1m", "5 دقائق": "5m", "15 دقيقة": "15m", "30 دقيقة": "30m",
+    "1 ساعة": "1h", "4 ساعات": "4h", "يومي": "1d"
+}
+tv_timeframes = {"1m":"1", "5m":"5", "15m":"15", "30m":"30", "1h":"60", "4h":"240", "1d":"D"}
+
+col_right, col_center, col_left = st.columns([1, 2.5, 1])
+
+with col_left:
+    st.markdown("### 🧮 حاسبة المخاطر")
+    capital = st.number_input("رأس المال ($)", value=1000, step=100)
+    risk_pct = st.number_input("نسبة المخاطرة (%)", value=1.0, step=0.1)
+    entry = st.number_input("سعر الدخول", value=4140.0)
+    sl = st.number_input("وقف الخسارة", value=4135.0)
+    tp = st.number_input("الهدف", value=4150.0)
+    
+    risk_amount = capital * (risk_pct / 100)
+    sl_distance = abs(entry - sl)
+    lot = round(risk_amount / sl_distance, 2) if sl_distance > 0 else 0
+    rr = round(abs(tp - entry) / sl_distance, 2) if sl_distance > 0 else 0
+    
+    st.metric("حجم العقد", lot)
+    st.metric("Risk / Reward", f"1 : {rr}")
+
+with col_center:
+    st.markdown("### 📈 الشارت المباشر (TradingView)")
+    cat_selected = st.selectbox("اختر القسم:", list(markets.keys()))
+    symbol_name = st.selectbox("اختر الزوج/السهم:", list(markets[cat_selected].keys()))
+    tv_symbol = markets[cat_selected][symbol_name]
+    
+    tf_selected = st.selectbox("اختر الفريم الزمني:", list(timeframes.keys()), index=1)
+    tv_timeframe = tv_timeframes[timeframes[tf_selected]]
+
+    tv_html = f"""
+    <div id="tv_chart_container"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script type="text/javascript">
+    new TradingView.widget({{
+      "width": "100%", "height": 600, "symbol": "{tv_symbol}",
+      "interval": "{tv_timeframe}", "timezone": "Africa/Algiers",
+      "theme": "dark", "style": "1", "locale": "ar",
+      "container_id": "tv_chart_container"
+    }});
+    </script>
+    """
+    components.html(tv_html, height=650)
+
+with col_right:
+    st.markdown("### 🔐 لوحة المالك")
+    
+    if not st.session_state.is_admin:
+        pwd = st.text_input("أدخل كلمة السر", type="password")
+        if st.button("دخول"):
+            if pwd == ADMIN_PASSWORD:
+                st.session_state.is_admin = True
+                st.success("✅ تم الدخول!")
+                st.rerun()
             else:
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="1d")
-                if data.empty:
-                    continue
-                price = data['Close'].iloc[-1]
+                st.error("❌ كلمة السر خاطئة")
+    
+    if st.session_state.is_admin:
+        st.success("🔓 مرحباً بك يا مالك البوت")
+        
+        if st.button("🚀 تحليل السوق", use_container_width=True):
+            with st.spinner("جاري التحليل..."):
+                source = "crypto" if "USDT" in symbol_name else ("metal" if "XAU" in symbol_name else "yahoo")
+                sym = symbol_name if source == "crypto" else ("XAU" if "XAU" in symbol_name else symbol_name)
+                st.session_state.last_analysis = execute_analysis(sym, symbol_name, source, timeframes[tf_selected])
 
-            if trade['type'] == 'BUY':
-                if price >= trade['tp4']:
-                    send_telegram(f"✅ *تم ضرب الهدف الرابع!* 🎯\n{trade['name']} | شراء\nالربح: +40$")
-                    del open_trades[symbol]
-                elif price >= trade['tp3']:
-                    send_telegram(f"✅ *تم ضرب الهدف الثالث!* 🎯\n{trade['name']} | شراء\nالربح: +30$")
-                    del open_trades[symbol]
-                elif price >= trade['tp2']:
-                    send_telegram(f"✅ *تم ضرب الهدف الثاني!* 🎯\n{trade['name']} | شراء\nالربح: +20$")
-                    del open_trades[symbol]
-                elif price >= trade['tp1']:
-                    send_telegram(f"✅ *تم ضرب الهدف الأول!* 🎯\n{trade['name']} | شراء\nالربح: +10$")
-                    del open_trades[symbol]
-                elif price <= trade['sl']:
-                    send_telegram(f"❌ *تم ضرب وقف الخسارة!* 🛑\n{trade['name']} | شراء\nالخسارة: -10$")
-                    del open_trades[symbol]
-            elif trade['type'] == 'SELL':
-                if price <= trade['tp4']:
-                    send_telegram(f"✅ *تم ضرب الهدف الرابع!* 🎯\n{trade['name']} | بيع\nالربح: +40$")
-                    del open_trades[symbol]
-                elif price <= trade['tp3']:
-                    send_telegram(f"✅ *تم ضرب الهدف الثالث!* 🎯\n{trade['name']} | بيع\nالربح: +30$")
-                    del open_trades[symbol]
-                elif price <= trade['tp2']:
-                    send_telegram(f"✅ *تم ضرب الهدف الثاني!* 🎯\n{trade['name']} | بيع\nالربح: +20$")
-                    del open_trades[symbol]
-                elif price <= trade['tp1']:
-                    send_telegram(f"✅ *تم ضرب الهدف الأول!* 🎯\n{trade['name']} | بيع\nالربح: +10$")
-                    del open_trades[symbol]
-                elif price >= trade['sl']:
-                    send_telegram(f"❌ *تم ضرب وقف الخسارة!* 🛑\n{trade['name']} | بيع\nالخسارة: -10$")
-                    del open_trades[symbol]
-        except Exception as e:
-            print(f"Error managing {trade['name']}: {e}")
+        if st.button("🔄 تحديث الصفقات (إدارة الأهداف)", use_container_width=True):
+            with st.spinner("جاري تحديث الصفقات..."):
+                manage_trades()
+                st.success("✅ تم تحديث الصفقات!")
 
-def check_asset(symbol, name, data_source, coin_id=None):
-    try:
-        df = None
-        daily_high = None
-        daily_low = None
-        
-        if data_source == "crypto":
-            if not coin_id:
-                coin_id = symbol.lower()
-            url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc?vs_currency=usd&days=1"
-            data = requests.get(url).json()
-            if len(data) >= 20:
-                df = pd.DataFrame(data, columns=['time', 'open', 'high', 'low', 'close'])
-                daily_high = df['high'].max()
-                daily_low = df['low'].min()
-        elif data_source == "yahoo":
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="5d", interval="1h")
-            if not df.empty:
-                df = df.rename(columns={'Close': 'close', 'High': 'high', 'Low': 'low'})
-                daily_high = df['high'].max()
-                daily_low = df['low'].min()
-        
-        if df is not None and len(df) >= 20:
-            analysis = analyze_smc(df)
-            if analysis:
-                current_price = analysis['price']
-                
-                if daily_high and daily_low:
-                    if current_price >= daily_high * 0.995:
-                        alert_key = f"{symbol}_HIGH"
-                        if alert_key not in daily_alerts_sent:
-                            msg = f"🚨 *تنبيه: اقتراب من أعلى سعر اليوم*\n{name} | السعر: `{current_price:.2f}`\nأعلى سعر: `{daily_high:.2f}`"
-                            send_telegram(msg)
-                            daily_alerts_sent[alert_key] = True
-                    elif current_price <= daily_low * 1.005:
-                        alert_key = f"{symbol}_LOW"
-                        if alert_key not in daily_alerts_sent:
-                            msg = f"🚨 *تنبيه: اقتراب من أدنى سعر اليوم*\n{name} | السعر: `{current_price:.2f}`\nأدنى سعر: `{daily_low:.2f}`"
-                            send_telegram(msg)
-                            daily_alerts_sent[alert_key] = True
+        if st.session_state.last_analysis:
+            res = st.session_state.last_analysis
+            if "error" in res:
+                st.error(res["error"])
+            elif res["trend"] == "NEUTRAL":
+                st.warning(f"⚠️ السوق متذبذب.\nالسعر: `{res['price']:.2f}`")
+            else:
+                st.success(f"✅ تم التحليل وإرسال الإشارة!")
+                st.write(f"**الاتجاه:** {res['emoji']} `{res['trend']}`")
+                st.write(f"**السعر:** `{res['price']:.2f}`")
+                st.write(f"**الستوب:** `{res['sl']:.2f}`")
+                st.write(f"**TP1:** `{res['tp1']:.2f}` | **TP2:** `{res['tp2']:.2f}`")
+                st.write(f"**TP3:** `{res['tp3']:.2f}` | **TP4:** `{res['tp4']:.2f}`")
 
-                if analysis['direction'] != "SIDEWAYS" and symbol not in open_trades:
-                    open_trade(symbol, name, current_price, analysis['direction'])
-                
-                print(f"Checked {name} | {analysis['direction']}")
-    except Exception as e:
-        print(f"Error checking {name}: {e}")
-
-print("🚀 بدأ تشغيل البوت الشامل...")
-
-while True:
-    try:
-        print("--- دورة جديدة ---")
-        
-        check_asset("BTCUSDT", "Bitcoin", "crypto", "bitcoin")
-        check_asset("ETHUSDT", "Ethereum", "crypto", "ethereum")
-        check_asset("SOLUSDT", "Solana", "crypto", "solana")
-        check_asset("BNBUSDT", "Binance Coin", "crypto", "binancecoin")
-        check_asset("XRPUSDT", "XRP", "crypto", "ripple")
-        check_asset("ADAUSDT", "Cardano", "crypto", "cardano")
-        check_asset("DOGEUSDT", "Dogecoin", "crypto", "dogecoin")
-        check_asset("AVAXUSDT", "Avalanche", "crypto", "avalanche-2")
-        check_asset("DOTUSDT", "Polkadot", "crypto", "polkadot")
-        check_asset("LINKUSDT", "Chainlink", "crypto", "chainlink")
-        
-        check_asset("EURUSD=X", "EUR/USD", "yahoo")
-        check_asset("GBPUSD=X", "GBP/USD", "yahoo")
-        check_asset("USDJPY=X", "USD/JPY", "yahoo")
-        check_asset("USDCAD=X", "USD/CAD", "yahoo")
-        check_asset("EURGBP=X", "EUR/GBP", "yahoo")
-        
-        check_asset("AAPL", "Apple", "yahoo")
-        check_asset("TSLA", "Tesla", "yahoo")
-        check_asset("^GSPC", "SPX500", "yahoo")
-        check_asset("^NDX", "NDQ", "yahoo")
-        
-        manage_trades()
-        
-        print("✅ تمت الدورة. في انتظار 5 دقائق...")
-        time.sleep(300)
-        
-    except Exception as e:
-        print(f"❌ خطأ: {e}")
-        time.sleep(60)
+        st.divider()
+        st.markdown("### 📊 الصفقات المفتوحة")
+        if not open_trades:
+            st.info("لا توجد صفقات مفتوحة.")
+        else:
+            for sym, t in open_trades.items():
+                with st.expander(f"{t['name']} — {t['type']}"):
+                    st.write(f"الدخول: `{t['entry']:.2f}` | الستوب: `{t['sl']:.2f}`")
+                    st.write(f"TP1: {'✅' if t['tp1_hit'] else '⏳'} | TP2: {'✅' if t['tp2_hit'] else '⏳'}")
+                    st.write(f"TP3: {'✅' if t['tp3_hit'] else '⏳'} | TP4: {'✅' if t['tp4_hit'] else '⏳'}")
+    else:
+        st.info("🔒 هذه المنطقة مخصصة للمالك فقط.")
