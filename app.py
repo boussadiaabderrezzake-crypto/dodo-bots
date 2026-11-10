@@ -11,6 +11,8 @@ import streamlit.components.v1 as components
 # ==========================================
 # 1. الإعدادات والسرية
 # ==========================================
+st.set_page_config(page_title="SMART TRADING AI", layout="wide", initial_sidebar_state="expanded")
+
 TOKEN = st.secrets.get("TELEGRAM_TOKEN")
 CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID")
 
@@ -33,23 +35,33 @@ if "open_trades" not in st.session_state:
     st.session_state.open_trades = {}
 open_trades = st.session_state.open_trades
 
+if "history" not in st.session_state:
+    st.session_state.history = []
+
 # ==========================================
-# 3. جلب البيانات والتحليل
+# 3. محرك جلب البيانات والتحليل SMC
 # ==========================================
-def fetch_data(symbol, source):
+def fetch_ohlcv(symbol, source, interval="5m"):
     try:
         if source == "metal":
-            df = yf.Ticker("GC=F").history(period="5d", interval="5m")
+            df = yf.Ticker("GC=F").history(period="5d", interval=interval)
             if df.empty: return None
             df = df.rename(columns={"Open":"open","High":"high","Low":"low","Close":"close","Volume":"volume"})
             return df.tail(300)
         elif source == "crypto":
-            r = requests.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=5m&limit=300", timeout=10)
+            # تعديل الفريم ليتوافق مع Binance
+            binance_int = interval.replace("d", "1d").replace("h", "1h").replace("m", "m")
+            r = requests.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={binance_int}&limit=300", timeout=10)
             if r.status_code != 200: return None
             raw = r.json()
             df = pd.DataFrame(raw, columns=["time","open","high","low","close","volume","ct","qav","trades","tb","tq","ig"])
             for c in ["open","high","low","close","volume"]: df[c] = df[c].astype(float)
             return df
+        else:
+            df = yf.Ticker(symbol).history(period="5d", interval=interval)
+            if df.empty: return None
+            df = df.rename(columns={"Open":"open","High":"high","Low":"low","Close":"close","Volume":"volume"})
+            return df.tail(300)
     except Exception as e:
         return None
 
@@ -59,34 +71,74 @@ def get_current_price(symbol, source):
             return float(requests.get(f"https://api.gold-api.com/price/{symbol}", timeout=10).json()['price'])
         elif source == "crypto":
             return float(requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}", timeout=10).json()['price'])
+        elif source == "yahoo":
+            df = yf.Ticker(symbol).history(period="1d", interval="1m")
+            if not df.empty: return float(df['Close'].iloc[-1])
     except Exception as e:
         return None
+    return None
 
 def analyze_smc(df):
-    if df is None or len(df) < 50: return "NEUTRAL"
-    obv = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
-    obv_ma = obv.rolling(20).mean()
-    sma50 = df['close'].rolling(50).mean().iloc[-1]
-    sma200 = df['close'].rolling(200).mean().iloc[-1]
+    if df is None or len(df) < 50: return None
+    df['sma50'] = df['close'].rolling(50).mean()
+    df['obv'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
+    df['obv_ma'] = df['obv'].rolling(20).mean()
+    
     last_close = df['close'].iloc[-1]
-    obv_val = obv.iloc[-1]
-    obv_ma_val = obv_ma.iloc[-1]
-    if last_close > sma50 and sma50 > sma200 and obv_val > obv_ma_val: return "BUY"
-    elif last_close < sma50 and sma50 < sma200 and obv_val < obv_ma_val: return "SELL"
-    return "NEUTRAL"
+    last_sma50 = df['sma50'].iloc[-1]
+    obv_val = df['obv'].iloc[-1]
+    obv_ma_val = df['obv_ma'].iloc[-1]
+    
+    trend = "NEUTRAL"
+    if last_close > last_sma50 and obv_val > obv_ma_val: trend = "BULLISH"
+    elif last_close < last_sma50 and obv_val < obv_ma_val: trend = "BEARISH"
+        
+    fvgs = []
+    for i in range(len(df)-30, len(df)):
+        if df['low'].iloc[i] > df['high'].iloc[i-2]:
+            fvgs.append({"type":"BULL", "top": df['low'].iloc[i], "bottom": df['high'].iloc[i-2]})
+        elif df['high'].iloc[i] < df['low'].iloc[i-2]:
+            fvgs.append({"type":"BEAR", "top": df['low'].iloc[i-2], "bottom": df['high'].iloc[i]})
+            
+    obs = []
+    for i in range(len(df)-15, len(df)):
+        if df['close'].iloc[i] > df['open'].iloc[i] and df['close'].iloc[i-1] < df['open'].iloc[i-1]:
+            obs.append({"type":"BULL", "top": df['high'].iloc[i-1], "bottom": df['low'].iloc[i-1]})
+        elif df['close'].iloc[i] < df['open'].iloc[i] and df['close'].iloc[i-1] > df['open'].iloc[i-1]:
+            obs.append({"type":"BEAR", "top": df['high'].iloc[i-1], "bottom": df['low'].iloc[i-1]})
+
+    confidence = 50
+    if trend != "NEUTRAL": confidence += 20
+    if len(fvgs) > 0: confidence += 15
+    if len(obs) > 0: confidence += 15
+
+    return {
+        "trend": trend, "last_close": last_close, "sma50": last_sma50,
+        "fvgs": fvgs[-2:], "obs": obs[-2:], "confidence": min(confidence, 95)
+    }
+
+def calculate_risk(capital, risk_pct, entry, sl, tp):
+    risk_amount = capital * (risk_pct / 100)
+    sl_distance = abs(entry - sl)
+    tp_distance = abs(tp - entry)
+    if sl_distance == 0: return 0, 0
+    lot_size = risk_amount / sl_distance
+    rr_ratio = tp_distance / sl_distance
+    return round(lot_size, 2), round(rr_ratio, 2)
 
 # ==========================================
-# 4. فتح الصفقة (مرة واحدة فقط)
+# 4. فتح الصفقة وإدارتها
 # ==========================================
-def open_trade(symbol, name, source):
+def open_trade(symbol, name, source, interval="5m"):
     if symbol in open_trades: return
 
-    df = fetch_data(symbol, source)
-    signal = analyze_smc(df)
-    if signal == "NEUTRAL": return
+    df = fetch_ohlcv(symbol, source, interval)
+    if df is None: return
+    res = analyze_smc(df)
+    if res is None or res["trend"] == "NEUTRAL": return
 
-    price = df['close'].iloc[-1]
-    if signal == "BUY":
+    price = res['last_close']
+    if res["trend"] == "BULLISH":
         sl = price - 5.0
         tp1, tp2, tp3, tp4 = price + 5.0, price + 10.0, price + 15.0, price + 20.0
         emoji = "🟢"
@@ -96,18 +148,20 @@ def open_trade(symbol, name, source):
         emoji = "🔴"
 
     open_trades[symbol] = {
-        'name': name, 'type': signal, 'entry': price, 'source': source,
+        'name': name, 'type': res["trend"], 'entry': price, 'source': source,
         'sl': sl, 'tp1': tp1, 'tp2': tp2, 'tp3': tp3, 'tp4': tp4,
         'tp1_hit': False, 'tp2_hit': False, 'tp3_hit': False, 'tp4_hit': False
     }
 
-    msg = f"🌟 *GOLDRIDER AI & SMC*\n"
-    msg += f"{emoji} *النوع:* `{signal}` ({name})\n"
+    msg = f"🌟 *GOLDRIDER AI (SMC)*\n"
+    msg += f"{emoji} *النوع:* `{res['trend']}` ({name})\n"
     msg += f"💰 *الدخول:* `{price:.2f}`\n"
-    msg += f"🛑 *الستوب لوز:* `{sl:.2f}`\n"
+    msg += f"🛑 *الستوب:* `{sl:.2f}`\n"
     msg += f"🎯 *TP1:* `{tp1:.2f}` | *TP2:* `{tp2:.2f}`\n"
-    msg += f"🎯 *TP3:* `{tp3:.2f}` | *TP4:* `{tp4:.2f}`"
     send_telegram(msg)
+    
+    # حفظ في السجل
+    st.session_state.history.append(f"{name} - {res['trend']} @ {price:.2f}")
 
 def manage_trades():
     for symbol in list(open_trades.keys()):
@@ -115,97 +169,136 @@ def manage_trades():
         price = get_current_price(symbol, trade.get('source'))
         if price is None: continue
 
-        if (trade['type'] == 'BUY' and price <= trade['sl']) or (trade['type'] == 'SELL' and price >= trade['sl']):
-            send_telegram(f"❌ *ضرب الستوب لوز* 🛑\n{trade['name']} ({trade['type']})")
+        if (trade['type'] == 'BULLISH' and price <= trade['sl']) or (trade['type'] == 'BEARISH' and price >= trade['sl']):
+            send_telegram(f"❌ *ضرب الستوب لوز* 🛑\n{trade['name']}")
             del open_trades[symbol]
             continue
 
-        if trade['type'] == 'BUY':
-            if price >= trade['tp4'] and not trade['tp4_hit']:
-                send_telegram(f"🏆 *تحقق الهدف الرابع (TP4)!*\n{trade['name']} +20 نقطة")
+        if trade['type'] == 'BULLISH':
+            if price >= trade['tp4']:
+                send_telegram(f"🏆 *تحقق الهدف الرابع (TP4)!*\n{trade['name']}")
                 del open_trades[symbol]; continue
             elif price >= trade['tp3'] and not trade['tp3_hit']:
-                trade['tp3_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثالث (TP3)!*\n{trade['name']} +15 نقطة")
+                trade['tp3_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثالث (TP3)!*\n{trade['name']}")
             elif price >= trade['tp2'] and not trade['tp2_hit']:
-                trade['tp2_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثاني (TP2)!*\n{trade['name']} +10 نقاط")
+                trade['tp2_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثاني (TP2)!*\n{trade['name']}")
             elif price >= trade['tp1'] and not trade['tp1_hit']:
                 trade['tp1_hit'] = True; trade['sl'] = trade['entry']
-                send_telegram(f"✅ *تحقق الهدف الأول (TP1) وتأمين الصفقة!* 🔒\n{trade['name']} +5 نقاط\nالستوب الآن عند الدخول.")
+                send_telegram(f"✅ *تحقق الهدف الأول (TP1) وتأمين!* 🔒\n{trade['name']}")
         else:
-            if price <= trade['tp4'] and not trade['tp4_hit']:
-                send_telegram(f"🏆 *تحقق الهدف الرابع (TP4)!*\n{trade['name']} +20 نقطة")
+            if price <= trade['tp4']:
+                send_telegram(f"🏆 *تحقق الهدف الرابع (TP4)!*\n{trade['name']}")
                 del open_trades[symbol]; continue
             elif price <= trade['tp3'] and not trade['tp3_hit']:
-                trade['tp3_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثالث (TP3)!*\n{trade['name']} +15 نقطة")
+                trade['tp3_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثالث (TP3)!*\n{trade['name']}")
             elif price <= trade['tp2'] and not trade['tp2_hit']:
-                trade['tp2_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثاني (TP2)!*\n{trade['name']} +10 نقاط")
+                trade['tp2_hit'] = True; send_telegram(f"🎯 *تحقق الهدف الثاني (TP2)!*\n{trade['name']}")
             elif price <= trade['tp1'] and not trade['tp1_hit']:
                 trade['tp1_hit'] = True; trade['sl'] = trade['entry']
-                send_telegram(f"✅ *تحقق الهدف الأول (TP1) وتأمين الصفقة!* 🔒\n{trade['name']} +5 نقاط\nالستوب الآن عند الدخول.")
+                send_telegram(f"✅ *تحقق الهدف الأول (TP1) وتأمين!* 🔒\n{trade['name']}")
 
 # ==========================================
 # 5. واجهة Streamlit والتصميم
 # ==========================================
-st.set_page_config(page_title="SMART TRADING AI", layout="wide")
-
-# توقيت الجزائر
 algeria_tz = pytz.timezone('Africa/Algiers')
 now = datetime.datetime.now(algeria_tz).strftime("%H:%M:%S | %Y-%m-%d")
 
-# التصميم (CSS)
 st.markdown(f"""
 <style>
-    .main-title {{ color: #d4af37; text-align: center; font-size: 40px; }}
-    .sub-title {{ color: #00bfff; text-align: center; font-size: 20px; }}
-    .time-box {{ text-align: center; color: #aaa; margin-bottom: 20px; }}
-    .metric-box {{ background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 10px; }}
+    .main-title {{ color: #d4af37; text-align: center; font-size: 40px; font-weight: bold; }}
+    .sub-title {{ color: #00bfff; text-align: center; font-size: 20px; margin-bottom: 5px; }}
+    .time-box {{ text-align: center; color: #aaa; margin-bottom: 20px; font-family: monospace; }}
 </style>
 <div class="main-title">🌟 SMART TRADING AI 🌟</div>
 <div class="sub-title">GOLDRIDER & RAZAKE TRADING</div>
 <div class="time-box">🇩🇿 توقيت الجزائر: {now}</div>
 """, unsafe_allow_html=True)
 
-# الأزواج والفريمات
-col1, col2, col3 = st.columns(3)
-with col1:
-    symbol = st.selectbox("زوج التداول", ["XAUUSD", "BTCUSDT", "ETHUSDT", "EURUSD"])
-with col2:
-    timeframe = st.selectbox("الفريم الزمني", ["1m", "5m", "15m", "1h"])
-with col3:
-    st.write("")
-    st.write("")
-    if st.button("🚀 تحليل الأسواق الآن", use_container_width=True):
-        with st.spinner("جاري التحليل وإرسال الإشارات..."):
-            open_trade("XAU", "Gold (XAUUSD)", "metal")
-            open_trade("BTCUSDT", "BTC/USDT", "crypto")
+markets = {
+    "السلع (Commodities)": {"XAUUSD": "OANDA:XAUUSD", "XAGUSD": "OANDA:XAGUSD", "USOIL": "TVC:USOIL"},
+    "العملات الرقمية (Crypto)": {"BTCUSDT": "BINANCE:BTCUSDT", "ETHUSDT": "BINANCE:ETHUSDT", "SOLUSDT": "BINANCE:SOLUSDT", "BNBUSDT": "BINANCE:BNBUSDT"},
+    "الفوركس (Forex)": {"EURUSD": "FX:EURUSD", "GBPUSD": "FX:GBPUSD", "USDJPY": "FX:USDJPY", "AUDUSD": "FX:AUDUSD"},
+    "الأسهم (Stocks)": {"AAPL": "NASDAQ:AAPL", "TSLA": "NASDAQ:TSLA", "MSFT": "NASDAQ:MSFT", "NVDA": "NASDAQ:NVDA"}
+}
+
+timeframes = {
+    "1 دقيقة": "1m", "5 دقائق": "5m", "15 دقيقة": "15m", "30 دقيقة": "30m",
+    "1 ساعة": "1h", "4 ساعات": "4h", "يومي": "1d"
+}
+tv_timeframes = {"1m":"1", "5m":"5", "15m":"15", "30m":"30", "1h":"60", "4h":"240", "1d":"D"}
+
+# تقسيم الشاشة (يمين - وسط - يسار)
+col_right, col_center, col_left = st.columns([1, 2.5, 1])
+
+# --- القائمة اليسرى (المعلومات وحاسبة المخاطر) ---
+with col_left:
+    st.markdown("### ℹ️ معلومات إضافية")
+    st.info("توقيت الشارت: الجزائر 🇩🇿")
+    st.markdown("---")
+    st.markdown("### 🧮 حاسبة المخاطر")
+    capital = st.number_input("رأس المال ($)", value=1000, step=100)
+    risk_pct = st.number_input("نسبة المخاطرة (%)", value=1.0, step=0.1)
+    entry = st.number_input("سعر الدخول", value=4140.0)
+    sl = st.number_input("وقف الخسارة", value=4135.0)
+    tp = st.number_input("الهدف", value=4150.0)
+    
+    lot, rr = calculate_risk(capital, risk_pct, entry, sl, tp)
+    st.metric("حجم العقد", lot)
+    st.metric("Risk / Reward", f"1 : {rr}")
+    st.markdown("---")
+    st.warning("تنبيه: التداول ينطوي على مخاطر.")
+
+# --- الشارت في الوسط ---
+with col_center:
+    st.markdown("### 📈 الشارت المباشر (TradingView)")
+    
+    cat_selected = st.selectbox("اختر القسم:", list(markets.keys()))
+    symbol_name = st.selectbox("اختر الزوج/السهم:", list(markets[cat_selected].keys()))
+    tv_symbol = markets[cat_selected][symbol_name]
+    
+    tf_selected = st.selectbox("اختر الفريم الزمني:", list(timeframes.keys()), index=1)
+    tv_timeframe = tv_timeframes[timeframes[tf_selected]]
+
+    tv_html = f"""
+    <div id="tv_chart_container"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script type="text/javascript">
+    new TradingView.widget({{
+      "width": "100%", "height": 600, "symbol": "{tv_symbol}",
+      "interval": "{tv_timeframe}", "timezone": "Africa/Algiers",
+      "theme": "dark", "style": "1", "locale": "ar",
+      "container_id": "tv_chart_container"
+    }});
+    </script>
+    """
+    components.html(tv_html, height=650)
+
+# --- القائمة اليمنى (التحليل) ---
+with col_right:
+    st.markdown("### ⚙️ إعدادات التحليل")
+    if st.button("🚀 تحليل السوق", use_container_width=True):
+        with st.spinner("جاري التحليل..."):
+            source = "crypto" if "USDT" in symbol_name else ("metal" if "XAU" in symbol_name else "yahoo")
+            sym = symbol_name if source == "crypto" else ("XAU" if "XAU" in symbol_name else symbol_name)
+            
+            open_trade(sym, symbol_name, source, timeframes[tf_selected])
             manage_trades()
             st.success("✅ تم التحليل!")
             st.rerun()
 
-# عرض الصفقات المفتوحة
-st.divider()
-st.subheader("📊 الصفقات المفتوحة حالياً")
-if not open_trades:
-    st.info("لا توجد صفقات مفتوحة حالياً. البوت ينتظر إشارة الدخول.")
-else:
-    for sym, t in open_trades.items():
-        with st.expander(f"{t['name']} — {t['type']}"):
-            st.write(f"الدخول: `{t['entry']:.2f}` | الستوب: `{t['sl']:.2f}`")
+    st.divider()
+    st.markdown("### 📊 الصفقات المفتوحة")
+    if not open_trades:
+        st.info("لا توجد صفقات مفتوحة.")
+    else:
+        for sym, t in open_trades.items():
+            with st.expander(f"{t['name']} — {t['type']}"):
+                st.write(f"الدخول: `{t['entry']:.2f}` | الستوب: `{t['sl']:.2f}`")
 
-# شارت TradingView
-st.divider()
-st.subheader("📈 الشارت المباشر (TradingView)")
-tv_symbol = "OANDA:XAUUSD" if symbol == "XAUUSD" else symbol.replace("USDT", "USD")
-tv_html = f"""
-<div id="tv_chart_container"></div>
-<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-<script type="text/javascript">
-new TradingView.widget({{
-  "width": "100%", "height": 500, "symbol": "{tv_symbol}",
-  "interval": "{timeframe.replace('m','').replace('h','')}", "timezone": "Africa/Algiers",
-  "theme": "dark", "style": "1", "locale": "ar",
-  "container_id": "tv_chart_container"
-}});
-</script>
-"""
-components.html(tv_html, height=550)
+    st.divider()
+    st.markdown("### 📜 سجل التحليلات")
+    if st.session_state.history:
+        for h in reversed(st.session_state.history[-5:]):
+            st.write(f"• {h}")
+    else:
+        st.write("لا يوجد سجل بعد.")
