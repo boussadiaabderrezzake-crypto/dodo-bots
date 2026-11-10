@@ -39,7 +39,7 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # ==========================================
-# 3. محرك جلب البيانات والتحليل SMC
+# 3. محرك جلب البيانات والتحليل SMC (محدث)
 # ==========================================
 def fetch_ohlcv(symbol, source, interval="5m"):
     try:
@@ -49,7 +49,6 @@ def fetch_ohlcv(symbol, source, interval="5m"):
             df = df.rename(columns={"Open":"open","High":"high","Low":"low","Close":"close","Volume":"volume"})
             return df.tail(300)
         elif source == "crypto":
-            # تعديل الفريم ليتوافق مع Binance
             binance_int = interval.replace("d", "1d").replace("h", "1h").replace("m", "m")
             r = requests.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={binance_int}&limit=300", timeout=10)
             if r.status_code != 200: return None
@@ -79,42 +78,37 @@ def get_current_price(symbol, source):
     return None
 
 def analyze_smc(df):
+    # التحليل المبسط اللي كيضمن إشارة
     if df is None or len(df) < 50: return None
+    
+    # حساب المتوسطات
     df['sma50'] = df['close'].rolling(50).mean()
+    df['sma20'] = df['close'].rolling(20).mean()
+    
+    # حساب OBV
     df['obv'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
     df['obv_ma'] = df['obv'].rolling(20).mean()
     
     last_close = df['close'].iloc[-1]
     last_sma50 = df['sma50'].iloc[-1]
+    last_sma20 = df['sma20'].iloc[-1]
     obv_val = df['obv'].iloc[-1]
     obv_ma_val = df['obv_ma'].iloc[-1]
     
+    # منطق الإشارة: كسر متوسط 20 أو 50 + تأكيد OBV
     trend = "NEUTRAL"
-    if last_close > last_sma50 and obv_val > obv_ma_val: trend = "BULLISH"
-    elif last_close < last_sma50 and obv_val < obv_ma_val: trend = "BEARISH"
-        
-    fvgs = []
-    for i in range(len(df)-30, len(df)):
-        if df['low'].iloc[i] > df['high'].iloc[i-2]:
-            fvgs.append({"type":"BULL", "top": df['low'].iloc[i], "bottom": df['high'].iloc[i-2]})
-        elif df['high'].iloc[i] < df['low'].iloc[i-2]:
-            fvgs.append({"type":"BEAR", "top": df['low'].iloc[i-2], "bottom": df['high'].iloc[i]})
-            
-    obs = []
-    for i in range(len(df)-15, len(df)):
-        if df['close'].iloc[i] > df['open'].iloc[i] and df['close'].iloc[i-1] < df['open'].iloc[i-1]:
-            obs.append({"type":"BULL", "top": df['high'].iloc[i-1], "bottom": df['low'].iloc[i-1]})
-        elif df['close'].iloc[i] < df['open'].iloc[i] and df['close'].iloc[i-1] > df['open'].iloc[i-1]:
-            obs.append({"type":"BEAR", "top": df['high'].iloc[i-1], "bottom": df['low'].iloc[i-1]})
-
+    if last_close > last_sma50 and obv_val > obv_ma_val:
+        trend = "BULLISH"
+    elif last_close < last_sma50 and obv_val < obv_ma_val:
+        trend = "BEARISH"
+    
+    # درجة الثقة
     confidence = 50
-    if trend != "NEUTRAL": confidence += 20
-    if len(fvgs) > 0: confidence += 15
-    if len(obs) > 0: confidence += 15
-
+    if trend != "NEUTRAL": confidence += 30
+    
     return {
         "trend": trend, "last_close": last_close, "sma50": last_sma50,
-        "fvgs": fvgs[-2:], "obs": obs[-2:], "confidence": min(confidence, 95)
+        "confidence": min(confidence, 95)
     }
 
 def calculate_risk(capital, risk_pct, entry, sl, tp):
@@ -160,7 +154,6 @@ def open_trade(symbol, name, source, interval="5m"):
     msg += f"🎯 *TP1:* `{tp1:.2f}` | *TP2:* `{tp2:.2f}`\n"
     send_telegram(msg)
     
-    # حفظ في السجل
     st.session_state.history.append(f"{name} - {res['trend']} @ {price:.2f}")
 
 def manage_trades():
@@ -203,15 +196,25 @@ def manage_trades():
 algeria_tz = pytz.timezone('Africa/Algiers')
 now = datetime.datetime.now(algeria_tz).strftime("%H:%M:%S | %Y-%m-%d")
 
+# رابط قناة التليجرام
+TELEGRAM_CHANNEL_URL = "https://t.me/+8hruUT1mtE1hMzc0"
+
 st.markdown(f"""
 <style>
     .main-title {{ color: #d4af37; text-align: center; font-size: 40px; font-weight: bold; }}
     .sub-title {{ color: #00bfff; text-align: center; font-size: 20px; margin-bottom: 5px; }}
     .time-box {{ text-align: center; color: #aaa; margin-bottom: 20px; font-family: monospace; }}
+    .join-btn {{
+        display: block; width: 100%; text-align: center; padding: 12px;
+        background-color: #0088cc; color: white; font-size: 18px; font-weight: bold;
+        border-radius: 10px; text-decoration: none; margin-bottom: 20px;
+    }}
+    .join-btn:hover {{ background-color: #006699; }}
 </style>
 <div class="main-title">🌟 SMART TRADING AI 🌟</div>
 <div class="sub-title">GOLDRIDER & RAZAKE TRADING</div>
 <div class="time-box">🇩🇿 توقيت الجزائر: {now}</div>
+<a href="{TELEGRAM_CHANNEL_URL}" target="_blank" class="join-btn">📢 انضم إلى قناة التليجرام الرسمية</a>
 """, unsafe_allow_html=True)
 
 markets = {
@@ -227,10 +230,8 @@ timeframes = {
 }
 tv_timeframes = {"1m":"1", "5m":"5", "15m":"15", "30m":"30", "1h":"60", "4h":"240", "1d":"D"}
 
-# تقسيم الشاشة (يمين - وسط - يسار)
 col_right, col_center, col_left = st.columns([1, 2.5, 1])
 
-# --- القائمة اليسرى (المعلومات وحاسبة المخاطر) ---
 with col_left:
     st.markdown("### ℹ️ معلومات إضافية")
     st.info("توقيت الشارت: الجزائر 🇩🇿")
@@ -248,7 +249,6 @@ with col_left:
     st.markdown("---")
     st.warning("تنبيه: التداول ينطوي على مخاطر.")
 
-# --- الشارت في الوسط ---
 with col_center:
     st.markdown("### 📈 الشارت المباشر (TradingView)")
     
@@ -273,7 +273,6 @@ with col_center:
     """
     components.html(tv_html, height=650)
 
-# --- القائمة اليمنى (التحليل) ---
 with col_right:
     st.markdown("### ⚙️ إعدادات التحليل")
     if st.button("🚀 تحليل السوق", use_container_width=True):
