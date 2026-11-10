@@ -255,6 +255,7 @@ tv_timeframes = {"1m":"1", "5m":"5", "15m":"15", "30m":"30", "1h":"60", "4h":"24
 
 col_right, col_center, col_left = st.columns([1, 2.5, 1])
 
+# --- اليسار: حاسبة المخاطر + اختيار اللوت ---
 with col_left:
     st.markdown("### 🧮 حاسبة المخاطر")
     capital = st.number_input("رأس المال ($)", value=1000, step=100)
@@ -263,14 +264,30 @@ with col_left:
     sl = st.number_input("وقف الخسارة", value=4135.0)
     tp = st.number_input("الهدف", value=4150.0)
     
+    # --- الحساب التلقائي للوت ---
     risk_amount = capital * (risk_pct / 100)
     sl_distance = abs(entry - sl)
-    lot = round(risk_amount / sl_distance, 2) if sl_distance > 0 else 0
-    rr = round(abs(tp - entry) / sl_distance, 2) if sl_distance > 0 else 0
+    auto_lot = round(risk_amount / (sl_distance * 100), 2) if sl_distance > 0 else 0.01
+    if auto_lot < 0.01: auto_lot = 0.01
     
-    st.metric("حجم العقد", lot)
+    # --- اختيار اللوت (تلقائي أو يدوي) ---
+    st.markdown("**حجم العقد (Lot)**")
+    lot_options = [0.01, 0.02, 0.03, 0.04, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]
+    
+    manual_lot = st.selectbox(
+        "اختر اللوت:",
+        lot_options,
+        index=0,
+        help="يمكنك اختيار اللوت يدوياً كيما MT5"
+    )
+    
+    st.info(f"💡 اللوت المحسوب تلقائياً: **{auto_lot}** (بناءً على المخاطرة)")
+    st.metric("اللوت المختار", manual_lot)
+    
+    rr = round(abs(tp - entry) / sl_distance, 2) if sl_distance > 0 else 0
     st.metric("Risk / Reward", f"1 : {rr}")
 
+# --- الوسط: الشارت ---
 with col_center:
     st.markdown("### 📈 الشارت المباشر (TradingView)")
     cat_selected = st.selectbox("اختر القسم:", list(markets.keys()))
@@ -294,6 +311,7 @@ with col_center:
     """
     components.html(tv_html, height=650)
 
+# --- اليمين: لوحة المالك ---
 with col_right:
     st.markdown("### 🔐 لوحة المالك")
     
