@@ -89,7 +89,7 @@ st.markdown("<div class='brand-title'>⭐ SMART TRADING AI ⭐</div>", unsafe_al
 st.markdown("<div class='brand-sub'>GOLDRIDER & RAZAKE TRADING</div>", unsafe_allow_html=True)
 st.markdown(f"<p style='text-align: center; color: #94a3b8; font-weight: bold;'>🇩🇿 توقيت الجزائر: {time_str} | التاريخ: {date_str}</p>", unsafe_allow_html=True)
 
-# أزرار التواصل والانضمام (مطابقة للصورة الثانية)
+# أزرار التواصل والانضمام (ظاهرة للجميع)
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
     st.markdown("""
@@ -122,19 +122,36 @@ if st.session_state.preview_start and not st.session_state.authenticated:
         st.session_state.preview_start = None
         st.rerun()
 
-# نبذة تعريفية ومميزات القناة
-with st.expander("📌 مميزات القناة والأصول المتاحة"):
-    st.markdown("""
-    <div class="info-card">
-    <b>توصيات يومية دقيقة باستخدام:</b> Smart Money Concept (SMC) | العرض والطلب | فيبوناتشي | الدعوم والمقاومات.<br>
-    ⭐ <b>المميزات:</b> دقة +85% | توصيات مباشرة | 3-5 توصيات يومياً | إدارة رأس مال ودعم طوال الأسبوع.<br>
-    ✅ <b>التواصل:</b> <a href="https://t.me/RazakeRaziko" target="_blank">t.me/RazakeRaziko</a>
-    </div>
-    """, unsafe_allow_html=True)
+# الجملة التعريفية الشاملة الجديدة (تظهر للزوار والمالك)
+st.markdown("""
+<div class="gold-box">
+<b>🔥 GOLDRIDER TRADING ( VIP ) 🔥</b><br>
+توصيات تداول يومية دقيقة مبنية على تحليل احترافي متكامل باستخدام:<br>
+✅ Smart Money Concept (SMC)<br>
+✅ العرض والطلب<br>
+✅ فيبوناتشي<br>
+✅ الدعوم والمقاومات<br>
+✅ النماذج الفنية الكلاسيكية<br><br>
+⭐ <b>مميزات القناة:</b><br>
+🔹 توصيات عالية الدقة مبنية على تحليل احترافي<br>
+🔹 نسبة نجاح مستهدفة +85%<br>
+🔹 جميع التوصيات مباشرة وواضحة (دخول – وقف – أهداف)<br>
+🔹 من 3 إلى 5 توصيات يوميًا<br>
+🔹 إدارة رأس مال مناسبة لكل نوع حساب<br>
+🔹 دعم فني وتحليلي طوال أيام أسبوع التداول<br><br>
+📊 <b>الأصول التي يتم التداول عليها:</b><br>
+💱 الفوركس<br>
+🥇 المعادن (الذهب – الفضة)<br>
+🪙 الكريبتو والعملات الرقمية<br><br>
+📌 <b>هدفنا:</b><br>
+تحقيق تداول منضبط، تقليل المخاطر، وزيادة الأرباح بخطة واضحة واحترافية<br><br>
+✅ <b>للانضمام تواصل معي على هذا الرابط 👈</b> <a href="https://t.me/RazakeRaziko" target="_blank">t.me/RazakeRaziko</a>
+</div>
+""", unsafe_allow_html=True)
 
 st.divider()
 
-# حاسبة إدارة اللوت (أزرار أفقية صغيرة ومتجاورة)
+# حاسبة إدارة اللوت (أزرار أفقية صغيرة ومتجاورة ظاهرة للجميع)
 st.markdown("### 🎛️ تحكم بحجم اللوت (Lot Size)")
 if 'lot_val' not in st.session_state:
     st.session_state.lot_val = 0.01
@@ -175,7 +192,7 @@ assets_dict = {
     "SPX (ستاندرد آند بورز 500)": {"tv": "FOREXCOM:SPXUSD", "price": 7634.81}
 }
 
-# اختيار الزوج وسعر السوق بشكل أفقي
+# اختيار الزوج وسعر السوق بشكل أفقي (ظاهر للجميع)
 col_a1, col_a2 = st.columns(2)
 with col_a1:
     asset = st.selectbox("اختر الزوج:", list(assets_dict.keys()))
@@ -185,7 +202,7 @@ with col_a2:
 
 st.divider()
 
-# 📊 منصة TradingView مع تفعيل أدوات الرسم والتحليل الفني والمؤشرات الكاملة
+# 📊 منصة TradingView والتحليل الفني (ظاهرة للجميع)
 st.markdown("### 📊 منصة TradingView والتحليل الفني")
 tv_symbol = assets_dict[asset]["tv"]
 tv_html = f"""
