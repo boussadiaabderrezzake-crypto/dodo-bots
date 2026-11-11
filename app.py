@@ -4,14 +4,15 @@ from datetime import datetime
 import pytz
 import time
 
-# إعداد الصفحة وتصميم الواجهة
+# ==========================================
+# 1. إعداد الصفحة وتصميم الواجهة
+# ==========================================
 st.set_page_config(
     page_title="GOLDRIDER TRADING AI (VIP)",
     page_icon="👑",
     layout="centered"
 )
 
-# تخصيص التصميم وإخفاء شريط أدوات التطبيق (Manage app) وقائمة الستريمليت للزوار
 st.markdown("""
 <style>
     .stApp { background-color: #080c14; color: #e2e8f0; font-size: 11px; }
@@ -21,7 +22,7 @@ st.markdown("""
     .stButton>button { background-color: #ffd700; color: #080c14; font-weight: bold; border-radius: 6px; width: 100%; font-size: 10px; padding: 3px; min-height: 28px; }
     .stButton>button:hover { background-color: #d4af37; color: #000; }
     div.stMetric { background-color: #0e1726; border: 1px solid #1e293b; padding: 3px; border-radius: 6px; text-align: center; font-size: 10px; }
-    .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 8px; border-radius: 8px; margin-bottom: 8px; font-size: 11px; line-height: 1.6; }
+    .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 11px; line-height: 1.6; }
     .info-card { background-color: #0e1726; border: 1px solid #1e293b; padding: 6px; border-radius: 8px; margin-bottom: 6px; font-size: 10px; }
     p, li, span, label { font-size: 10px !important; }
     .brand-title { text-align: center; font-weight: 900; font-size: 20px; color: #ffd700; margin-bottom: 0px; text-shadow: 0 0 10px rgba(255,215,0,0.3); }
@@ -29,12 +30,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# بيانات التوكن والمعرف (Chat ID) الخاصة بك
+# ==========================================
+# 2. بيانات الاتصال والمعرفات
+# ==========================================
 TELEGRAM_TOKEN = "9206676062:AAHkdzTn8zCbk2Of4gmGbr6GvyBasER1gOw"
 TELEGRAM_CHAT_ID = "-1003911614530"
 OWNER_CODE = "011989"
 
-# إدارة الجلسات وحالة التحقق والمعاينة المجانية
+# ==========================================
+# 3. إدارة الجلسات وحالة التحقق
+# ==========================================
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'preview_start' not in st.session_state:
@@ -49,7 +54,7 @@ if not st.session_state.authenticated:
     </style>
     """, unsafe_allow_html=True)
 
-# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية) دون تكرار مزعج للصفحة
+# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية)
 if st.session_state.preview_start and not st.session_state.authenticated:
     elapsed = time.time() - st.session_state.preview_start
     if elapsed > 300:
@@ -78,13 +83,14 @@ if not st.session_state.authenticated and st.session_state.preview_start is None
             st.rerun()
     st.stop()
 
-# توقيت الجزائر الحي (الساعة، اليوم، الشهر، السنة)
+# ==========================================
+# 4. التوقيت والهيدر الرئيسي
+# ==========================================
 dz_tz = pytz.timezone('Africa/Algiers')
 now_dz = datetime.now(dz_tz)
 time_str = now_dz.strftime('%H:%M:%S')
 date_str = now_dz.strftime('%d-%m-%Y')
 
-# الهيدر المطور مطابق للصورتين بدقة
 st.markdown("<div class='brand-title'>⭐ SMART TRADING AI ⭐</div>", unsafe_allow_html=True)
 st.markdown("<div class='brand-sub'>GOLDRIDER & RAZAKE TRADING</div>", unsafe_allow_html=True)
 st.markdown(f"<p style='text-align: center; color: #94a3b8; font-weight: bold;'>🇩🇿 توقيت الجزائر: {time_str} | التاريخ: {date_str}</p>", unsafe_allow_html=True)
@@ -108,19 +114,16 @@ with col_btn2:
         </a>
     """, unsafe_allow_html=True)
 
-st.markdown("<h3 style='margin-top: 15px;'>👑 عروض الاشتراك في قناة VIP 👑</h3>", unsafe_allow_html=True)
-
-# تنبيه وقت المعاينة المجانية إن وجد (بدون تكرار مزعج للشاشة)
+# تنبيه المعاينة إن وجد
 if st.session_state.preview_start and not st.session_state.authenticated:
     elapsed_time = time.time() - st.session_state.preview_start
     remaining = int(300 - elapsed_time)
     if remaining > 0:
         st.info(f"⏳ معاينة مجانية متبقية: {remaining // 60}د و {remaining % 60}ث.")
-    else:
-        st.session_state.preview_start = None
-        st.rerun()
 
-# الجملة التعريفية الشاملة الجديدة (تظهر للزوار والمالك بوضوح تام)
+# ==========================================
+# 5. النص التعريفي الشامل للقناة
+# ==========================================
 st.markdown("""
 <div class="gold-box">
 <b>🔥 GOLDRIDER TRADING ( VIP ) 🔥</b><br>
@@ -149,7 +152,9 @@ st.markdown("""
 
 st.divider()
 
-# حاسبة إدارة اللوت (أزرار أفقية صغيرة ومتجاورة ظاهرة للجميع)
+# ==========================================
+# 6. حاسبة اللوت وأزواج العملات والشارت (ظاهرة للجميع)
+# ==========================================
 st.markdown("### 🎛️ تحكم بحجم اللوت (Lot Size)")
 if 'lot_val' not in st.session_state:
     st.session_state.lot_val = 0.01
@@ -176,7 +181,6 @@ with l_col3:
 
 st.divider()
 
-# خريطة الأصول المستخرجة مع رموز TradingView
 assets_dict = {
     "BTCUSD (بتكوين / دولار أمريكي)": {"tv": "BINANCE:BTCUSDT", "price": 74445.0},
     "GOLD (الذهب / دولار أمريكي / أونصة)": {"tv": "OANDA:XAUUSD", "price": 3996.99},
@@ -190,7 +194,6 @@ assets_dict = {
     "SPX (ستاندرد آند بورز 500)": {"tv": "FOREXCOM:SPXUSD", "price": 7634.81}
 }
 
-# اختيار الزوج وسعر السوق بشكل أفقي (ظاهر للجميع)
 col_a1, col_a2 = st.columns(2)
 with col_a1:
     asset = st.selectbox("اختر الزوج:", list(assets_dict.keys()))
@@ -200,7 +203,7 @@ with col_a2:
 
 st.divider()
 
-# 📊 منصة TradingView والتحليل الفني (ظاهرة للجميع)
+# شارت TradingView مع أدوات الرسم والتحليل
 st.markdown("### 📊 منصة TradingView والتحليل الفني")
 tv_symbol = assets_dict[asset]["tv"]
 tv_html = f"""
@@ -224,7 +227,9 @@ st.components.v1.html(tv_html, height=430)
 
 st.divider()
 
-# 🔒 حاسبة الصفقات وأزرار الإرسال (مخفية تماماً عن الزوار، وتظهر حصرياً لمالك البوت بعد تسجيل الدخول)
+# ==========================================
+# 7. لوحة التحكم وإدارة الصفقات (خاص بمالك البوت حصراً)
+# ==========================================
 if st.session_state.authenticated:
     st.markdown("### 🧮 حاسبة المخاطر والأهداف الأربعة (خاص بالمالك)")
     sl = current_price - 10.00
@@ -248,7 +253,6 @@ if st.session_state.authenticated:
 
     st.divider()
 
-    # وظيفة إرسال الرسائل إلى تيليجرام
     def send_tg(text):
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}
