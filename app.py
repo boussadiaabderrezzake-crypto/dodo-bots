@@ -24,6 +24,8 @@ st.markdown("""
     .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 6px; border-radius: 8px; margin-bottom: 6px; font-size: 10px; }
     .info-card { background-color: #0e1726; border: 1px solid #1e293b; padding: 6px; border-radius: 8px; margin-bottom: 6px; font-size: 10px; }
     p, li, span, label { font-size: 10px !important; }
+    .brand-title { text-align: center; font-weight: 900; font-size: 20px; color: #ffd700; margin-bottom: 0px; text-shadow: 0 0 10px rgba(255,215,0,0.3); }
+    .brand-sub { text-align: center; font-weight: bold; font-size: 13px; color: #00f0ff; margin-bottom: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,11 +72,33 @@ if not st.session_state.authenticated and not st.session_state.preview_start:
 dz_tz = pytz.timezone('Africa/Algiers')
 now_dz = datetime.now(dz_tz)
 time_str = now_dz.strftime('%H:%M:%S')
-date_str = now_dz.strftime('%d/%m/%Y')
+date_str = now_dz.strftime('%d-%m-%Y')
 
-# الهيدر وعرض التوقيت المحلي
-st.markdown("<h1>🔥 GOLDRIDER TRADING ( VIP ) 🔥</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: #00f0ff; font-weight: bold; font-size: 11px;'>🇩🇿 الجزائر: {time_str} | التاريخ: {date_str}</p>", unsafe_allow_html=True)
+# الهيدر المطور مطابق للصورتين بدقة
+st.markdown("<div class='brand-title'>⭐ SMART TRADING AI ⭐</div>", unsafe_allow_html=True)
+st.markdown("<div class='brand-sub'>GOLDRIDER & RAZAKE TRADING</div>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; color: #94a3b8; font-weight: bold;'>🇩🇿 توقيت الجزائر: {time_str} | التاريخ: {date_str}</p>", unsafe_allow_html=True)
+
+# أزرار التواصل والانضمام (مطابقة للصورة الثانية)
+col_btn1, col_btn2 = st.columns(2)
+with col_btn1:
+    st.markdown("""
+        <a href="https://t.me/RazakeRaziko" target="_blank">
+            <button style="background: linear-gradient(135deg, #0088cc, #00aced); color: white; border: none; padding: 8px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; font-size: 11px;">
+                📢 طلب الانضمام إلى قناة التيليجرام
+            </button>
+        </a>
+    """, unsafe_allow_html=True)
+with col_btn2:
+    st.markdown("""
+        <a href="https://wa.me/213667570565" target="_blank">
+            <button style="background: linear-gradient(135deg, #25d366, #128c7e); color: white; border: none; padding: 8px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; font-size: 11px;">
+                💬 التواصل معنا على واتساب
+            </button>
+        </a>
+    """, unsafe_allow_html=True)
+
+st.markdown("<h3 style='margin-top: 15px;'>👑 عروض الاشتراك في قناة VIP 👑</h3>", unsafe_allow_html=True)
 
 # تذكير بوضع المعاينة النشطة إن وجد
 if st.session_state.preview_start and not st.session_state.authenticated:
@@ -183,7 +207,7 @@ st.components.v1.html(tv_html, height=310)
 
 st.divider()
 
-# 🔒 قسم الصفقات وتحليل المخاطر (مخفي للزوار في وضع المعاينة ويظهر للمالك فقط)
+# 🔒 قسم الصفقات وتحليل المخاطر واختبار قناة التليجرام (مخفي للزوار ويظهر للمالك فقط)
 if st.session_state.authenticated:
     st.markdown("### 🧮 حاسبة المخاطر والأهداف الأربعة (خاص بالمالك)")
     sl = current_price - 10.00
@@ -214,14 +238,14 @@ if st.session_state.authenticated:
         try:
             res = requests.post(url, json=payload, timeout=10)
             if res.json().get("ok"):
-                st.success("✅ تم الإرسال للقناة!")
+                st.success("✅ تم الإرسال للقناة بنجاح!")
             else:
                 st.error("❌ فشل الإرسال.")
         except Exception as e:
             st.error(f"❌ خطأ: {e}")
 
-    # أزرار التحكم وإرسال التنبيهات (أفقية متجاورة بالكامل)
-    st.markdown("### 🚀 أزرار التحكم وإرسال التنبيهات (أفقية)")
+    # أزرار التحكم وإرسال التنبيهات واختبار القناة (أفقية متجاورة)
+    st.markdown("### 🚀 أزرار التحكم وإرسال التنبيهات واختبار القناة")
 
     b_col1, b_col2, b_col3, b_col4 = st.columns(4)
     with b_col1:
@@ -241,12 +265,19 @@ if st.session_state.authenticated:
             send_tg(msg)
 
     with b_col2:
-        if st.button("اختبار 🧪"):
-            send_tg(f"🧪 <b>اختبار النظام</b>\n🔹 <b>الزوج:</b> {asset}\n🎯 <b>السعر:</b> <code>{current_price:.2f}</code>")
+        if st.button("اختبار البوت 🧪"):
+            test_msg = (
+                f"🧪 <b>اختبار اتصال بوت تيليجرام بنجاح!</b>\n"
+                f"⭐ <b>SMART TRADING AI</b>\n"
+                f"🔹 <b>الزوج الحالي:</b> {asset}\n"
+                f"🎯 <b>السعر:</b> <code>{current_price:.2f}</code>\n"
+                f"✅ النظام يعمل بكفاءة تامة."
+            )
+            send_tg(test_msg)
 
     with b_col3:
         if st.button("إغلاق يدوي 🔒"):
-            send_tg(f"🔒 <b>إغلاق يدوي</b>\n🔹 <b>الزوج:</b> {asset}")
+            send_tg(f"🔒 <b>إغلاق يدوي للصفقة</b>\n🔹 <b>الزوج:</b> {asset}")
 
     with b_col4:
         if st.button("ضرب الاستوب 🛑"):
@@ -256,15 +287,15 @@ if st.session_state.authenticated:
     p1, p2, p3, p4 = st.columns(4)
     with p1:
         if st.button("BOOM TP1 💥"):
-            send_tg(f"💥 <b>تحقيق الهدف 1!</b> 🎯\n🔹 {asset} | السعر: <code>{tp1:.2f}</code> | الربح: +5$\n🛡️ <b>تم تفعيل التأمين</b>")
+            send_tg(f"💥 <b>BOOM! تحقيق الهدف 1!</b> 🎯\n🔹 {asset} | السعر: <code>{tp1:.2f}</code> | الربح: +5$\n🛡️ <b>تم تفعيل التأمين</b>")
     with p2:
         if st.button("BOOM TP2 💥"):
-            send_tg(f"💥 <b>تحقيق الهدف 2!</b> 🎯\n🔹 {asset} | السعر: <code>{tp2:.2f}</code> | الربح: +10$")
+            send_tg(f"💥 <b>BOOM! تحقيق الهدف 2!</b> 🎯\n🔹 {asset} | السعر: <code>{tp2:.2f}</code> | الربح: +10$")
     with p3:
         if st.button("BOOM TP3 💥"):
-            send_tg(f"💥 <b>تحقيق الهدف 3!</b> 🎯\n🔹 {asset} | السعر: <code>{tp3:.2f}</code> | الربح: +15$")
+            send_tg(f"💥 <b>BOOM! تحقيق الهدف 3!</b> 🎯\n🔹 {asset} | السعر: <code>{tp3:.2f}</code> | الربح: +15$")
     with p4:
         if st.button("BOOM TP4 💥"):
-            send_tg(f"💥 <b>تحقيق الهدف 4 والأخير!</b> 🎯\n🔹 {asset} | السعر: <code>{tp4:.2f}</code> | الإجمالي: +20$")
+            send_tg(f"💥 <b>BOOM! تحقيق الهدف 4 والأخير!</b> 🎯\n🔹 {asset} | السعر: <code>{tp4:.2f}</code> | الإجمالي: +20$")
 else:
-    st.info("🔒 **حاسبة الصفقات وأزرار الإرسال مخفية في وضع المعاينة المجانية.** تظهر هذه الخيارات حصرياً لمالك البوت بعد تسجيل الدخول بررمز المرور.")
+    st.info("🔒 **حاسبة الصفقات وأزرار الإرسال واختبار القناة مخفية في وضع المعاينة المجانية.** تظهر هذه الخيارات حصرياً لمالك البوت بعد تسجيل الدخول بررمز المرور.")
