@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# تخصيص التصميم وتصغير أحجام الخطوط والعناصر لتظهر أفقياً ومرتبة بالكامل
+# تخصيص التصميم وتصغير أحجام الخطوط والعناصر، وإخفاء زر إدارة التطبيق (Manage app) عن الزوار
 st.markdown("""
 <style>
     .stApp { background-color: #080c14; color: #e2e8f0; font-size: 11px; }
@@ -40,12 +40,21 @@ if 'authenticated' not in st.session_state:
 if 'preview_start' not in st.session_state:
     st.session_state.preview_start = None
 
-# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية)
+# إخفاء قائمة وطتوثيق "Manage app" عن الزوار عبر CSS إضافي إن لم يكونوا مالكين
+if not st.session_state.authenticated:
+    st.markdown("""
+    <style>
+        [data-testid="stStatusWidget"], footer, #MainMenu {visibility: hidden; display: none;}
+    </style>
+    """, unsafe_allow_html=True)
+
+# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية بدقة تامة)
 if st.session_state.preview_start and not st.session_state.authenticated:
     elapsed = time.time() - st.session_state.preview_start
     if elapsed > 300:
         st.session_state.preview_start = None
         st.warning("⏰ انتهت فترة المعاينة المجانية (5 دقائق). يرجى إدخال رمز المالك للمتابعة.")
+        st.rerun()
 
 # شاشة حظر الدخول المباشر وتسجيل الدخول بكلمة السر السرية
 if not st.session_state.authenticated and not st.session_state.preview_start:
@@ -100,10 +109,17 @@ with col_btn2:
 
 st.markdown("<h3 style='margin-top: 15px;'>👑 عروض الاشتراك في قناة VIP 👑</h3>", unsafe_allow_html=True)
 
-# تذكير بوضع المعاينة النشطة إن وجد
+# تذكير بوضع المعاينة النشطة إن وجد مع عداد تنازلي دقيق
 if st.session_state.preview_start and not st.session_state.authenticated:
-    remaining = int(300 - (time.time() - st.session_state.preview_start))
-    st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث. (التحليلات والصفقات مخفية في وضع المعاينة)")
+    elapsed_time = time.time() - st.session_state.preview_start
+    remaining = int(300 - elapsed_time)
+    if remaining > 0:
+        st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث. (التحليلات والصفقات مخفية في وضع المعاينة)")
+        time.sleep(1)
+        st.rerun()
+    else:
+        st.session_state.preview_start = None
+        st.rerun()
 
 # نبذة تعريفية ومميزات القناة
 with st.expander("📌 مميزات القناة والأصول المتاحة"):
