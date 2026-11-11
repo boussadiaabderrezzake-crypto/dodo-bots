@@ -19,7 +19,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# بيانات التوكن والاتصال الخاصة بك
+# بيانات التوكن والمعرف (Chat ID) الجديدة الخاصة بك
 TELEGRAM_TOKEN = "9206676062:AAHkdzTn8zCbk2Of4gmGbr6GvyBasER1gOw"
 TELEGRAM_CHAT_ID = "-1003911614530"
 OWNER_CODE = "011989"
