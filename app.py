@@ -21,7 +21,7 @@ st.markdown("""
     .stButton>button { background-color: #ffd700; color: #080c14; font-weight: bold; border-radius: 6px; width: 100%; font-size: 10px; padding: 3px; min-height: 28px; }
     .stButton>button:hover { background-color: #d4af37; color: #000; }
     div.stMetric { background-color: #0e1726; border: 1px solid #1e293b; padding: 3px; border-radius: 6px; text-align: center; font-size: 10px; }
-    .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 6px; border-radius: 8px; margin-bottom: 6px; font-size: 10px; }
+    .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 8px; border-radius: 8px; margin-bottom: 8px; font-size: 11px; line-height: 1.6; }
     .info-card { background-color: #0e1726; border: 1px solid #1e293b; padding: 6px; border-radius: 8px; margin-bottom: 6px; font-size: 10px; }
     p, li, span, label { font-size: 10px !important; }
     .brand-title { text-align: center; font-weight: 900; font-size: 20px; color: #ffd700; margin-bottom: 0px; text-shadow: 0 0 10px rgba(255,215,0,0.3); }
@@ -49,7 +49,7 @@ if not st.session_state.authenticated:
     </style>
     """, unsafe_allow_html=True)
 
-# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية)
+# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية) دون تكرار مزعج للصفحة
 if st.session_state.preview_start and not st.session_state.authenticated:
     elapsed = time.time() - st.session_state.preview_start
     if elapsed > 300:
@@ -110,19 +110,17 @@ with col_btn2:
 
 st.markdown("<h3 style='margin-top: 15px;'>👑 عروض الاشتراك في قناة VIP 👑</h3>", unsafe_allow_html=True)
 
-# تنبيه وقت المعاينة المجانية إن وجد مع تحديث حقيقي
+# تنبيه وقت المعاينة المجانية إن وجد (بدون تكرار مزعج للشاشة)
 if st.session_state.preview_start and not st.session_state.authenticated:
     elapsed_time = time.time() - st.session_state.preview_start
     remaining = int(300 - elapsed_time)
     if remaining > 0:
-        st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث.")
-        time.sleep(1)
-        st.rerun()
+        st.info(f"⏳ معاينة مجانية متبقية: {remaining // 60}د و {remaining % 60}ث.")
     else:
         st.session_state.preview_start = None
         st.rerun()
 
-# الجملة التعريفية الشاملة الجديدة (تظهر للزوار والمالك)
+# الجملة التعريفية الشاملة الجديدة (تظهر للزوار والمالك بوضوح تام)
 st.markdown("""
 <div class="gold-box">
 <b>🔥 GOLDRIDER TRADING ( VIP ) 🔥</b><br>
