@@ -14,16 +14,16 @@ st.set_page_config(
 # تخصيص التصميم وتصغير أحجام الخطوط والعناصر لتظهر أفقياً ومرتبة بالكامل
 st.markdown("""
 <style>
-    .stApp { background-color: #080c14; color: #e2e8f0; font-size: 12px; }
-    h1 { color: #ffd700 !important; text-align: center; font-size: 18px !important; margin-bottom: 2px; }
-    h2 { color: #ffd700 !important; text-align: center; font-size: 15px !important; }
-    h3, h4 { color: #ffd700 !important; text-align: center; font-size: 13px !important; }
-    .stButton>button { background-color: #ffd700; color: #080c14; font-weight: bold; border-radius: 6px; width: 100%; font-size: 11px; padding: 4px; min-height: 32px; }
+    .stApp { background-color: #080c14; color: #e2e8f0; font-size: 11px; }
+    h1 { color: #ffd700 !important; text-align: center; font-size: 16px !important; margin-bottom: 2px; }
+    h2 { color: #ffd700 !important; text-align: center; font-size: 14px !important; }
+    h3, h4 { color: #ffd700 !important; text-align: center; font-size: 12px !important; }
+    .stButton>button { background-color: #ffd700; color: #080c14; font-weight: bold; border-radius: 6px; width: 100%; font-size: 10px; padding: 3px; min-height: 28px; }
     .stButton>button:hover { background-color: #d4af37; color: #000; }
-    div.stMetric { background-color: #0e1726; border: 1px solid #1e293b; padding: 4px; border-radius: 6px; text-align: center; font-size: 11px; }
-    .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 8px; border-radius: 8px; margin-bottom: 8px; font-size: 11px; }
-    .info-card { background-color: #0e1726; border: 1px solid #1e293b; padding: 8px; border-radius: 8px; margin-bottom: 8px; font-size: 11px; }
-    p, li, span, label { font-size: 11px !important; }
+    div.stMetric { background-color: #0e1726; border: 1px solid #1e293b; padding: 3px; border-radius: 6px; text-align: center; font-size: 10px; }
+    .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 6px; border-radius: 8px; margin-bottom: 6px; font-size: 10px; }
+    .info-card { background-color: #0e1726; border: 1px solid #1e293b; padding: 6px; border-radius: 8px; margin-bottom: 6px; font-size: 10px; }
+    p, li, span, label { font-size: 10px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -79,15 +79,14 @@ st.markdown(f"<p style='text-align: center; color: #00f0ff; font-weight: bold; f
 # تذكير بوضع المعاينة النشطة إن وجد
 if st.session_state.preview_start and not st.session_state.authenticated:
     remaining = int(300 - (time.time() - st.session_state.preview_start))
-    st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث.")
+    st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث. (الصفقات وأزرار الإرسال مخفية في وضع المعاينة)")
 
-# نبذة تعريفية بالخدمة ومميزات القناة الاحترافية
+# نبذة تعريفية ومميزات القناة
 with st.expander("📌 مميزات القناة والأصول المتاحة"):
     st.markdown("""
     <div class="info-card">
-    <b>توصيات يومية دقيقة باستخدام:</b> Smart Money Concept (SMC) | العرض والطلب | فيبوناتشي | الدعوم والمقاومات | الكلاسيك.<br>
+    <b>توصيات يومية دقيقة باستخدام:</b> Smart Money Concept (SMC) | العرض والطلب | فيبوناتشي | الدعوم والمقاومات.<br>
     ⭐ <b>المميزات:</b> دقة +85% | توصيات مباشرة | 3-5 توصيات يومياً | إدارة رأس مال ودعم طوال الأسبوع.<br>
-    📊 <b>الأصول:</b> الفوركس | المعادن (الذهب/الفضة) | الكريبتو.<br>
     ✅ <b>التواصل:</b> <a href="https://t.me/RazakeRaziko" target="_blank">t.me/RazakeRaziko</a>
     </div>
     """, unsafe_allow_html=True)
@@ -121,49 +120,58 @@ with l_col3:
 
 st.divider()
 
-# اختيار الزوج وسعر السوق (بشكل أفقي)
+# خريطة الأصول المستخرجة من صورتك مع رموز TradingView
+assets_dict = {
+    "BTCUSD (بتكوين / دولار أمريكي)": {"tv": "BINANCE:BTCUSDT", "price": 74445.0},
+    "GOLD (الذهب / دولار أمريكي / أونصة)": {"tv": "OANDA:XAUUSD", "price": 3996.99},
+    "EURUSD (يورو / دولار أمريكي)": {"tv": "FX:EURUSD", "price": 1.1092},
+    "GBPUSD (جنيه إسترليني / دولار أمريكي)": {"tv": "FX:GBPUSD", "price": 1.3274},
+    "USOIL (عقود الفروقات للنفط الخام)": {"tv": "TVC:USOIL", "price": 87.17},
+    "USDJPY (دولار أمريكي / ين ياباني)": {"tv": "FX:USDJPY", "price": 159.87},
+    "AAPL (Apple Inc)": {"tv": "NASDAQ:AAPL", "price": 354.66},
+    "TSLA (Tesla, Inc.)": {"tv": "NASDAQ:TSLA", "price": 392.51},
+    "SPX500 (مؤشر ستاندرد آند بورز 500)": {"tv": "OANDA:SPX500USD", "price": 7634.8},
+    "SPX (ستاندرد آند بورز 500)": {"tv": "FOREXCOM:SPXUSD", "price": 7634.81}
+}
+
+# اختيار الزوج وسعر السوق بشكل أفقي
 col_a1, col_a2 = st.columns(2)
 with col_a1:
-    asset = st.selectbox("الزوج:", ["XAUUSD (الذهب)", "XAGUSD (الفضة)", "BTCUSDT", "ETHUSDT", "EURUSD"])
+    asset = st.selectbox("اختر الزوج:", list(assets_dict.keys()))
 with col_a2:
-    current_price = st.number_input("السعر الحالي:", value=4001.79, step=0.01)
+    default_p = assets_dict[asset]["price"]
+    current_price = st.number_input("السعر الحالي:", value=default_p, step=0.01)
 
 st.divider()
 
-# خاصية تحليل السوق وتحليل الصفقة (مدمجة ومنظمة بشكل أفقي)
-st.markdown("### 🔍 تحليل السوق وتحليل الصفقة الذكي")
+# خاصية تحليل السوق وتحليل الصفقة (أفقية ومضغوطة)
+st.markdown("### 🔍 تحليل السوق وتحليل الصفقة")
 col_ana1, col_ana2 = st.columns(2)
 with col_ana1:
-    market_trend = st.selectbox("اتجاه السوق العام:", ["صاعد قوي (Bullish)", "هابط قوي (Bearish)", "عرضي (Consolidation)"])
+    market_trend = st.selectbox("الاتجاه العام:", ["صاعد قوي (Bullish)", "هابط قوي (Bearish)", "عرضي (Consolidation)"])
 with col_ana2:
     strategy_mode = st.selectbox("استراتيجية الدخول:", ["SMC & Order Block", "العرض والطلب", "كلاسيكي ودعوم"])
 
 ana_btn1, ana_btn2 = st.columns(2)
 with ana_btn1:
-    if st.button("📊 فحص وتحليل السوق"):
-        st.success(f"✅ تحليل {asset}: الاتجاه ({market_trend}) يدعم الصفقات الإيجابية وفقاً لهيكل السوق الحالي.")
+    if st.button("📊 فحص السوق"):
+        st.success(f"✅ الاتجاه ({market_trend}) يدعم الصفقات إيجابياً.")
 with ana_btn2:
-    if st.button("🔬 فحص جاهزية الصفقة"):
-        st.info(f"🔍 تقييم الصفقة ({strategy_mode}): نسبة المخاطرة للعائد ممتازة، ومؤشر العزم متوافق مع اللوت ({st.session_state.lot_val}).")
+    if st.button("🔬 فحص الصفقة"):
+        st.info(f"🔍 نسبة المخاطرة ممتازة مع اللوت ({st.session_state.lot_val}).")
 
 st.divider()
 
-# منصة TradingView ومؤشرات التحليل (مرئية بالكامل ودون إخفاء)
-st.markdown("### 📊 منصة TradingView ومؤشر GOLDRIDER OBV & SMC")
-st.markdown("""
-<div class="gold-box">
-    <b>⚙️ المؤشرات المؤسسية (Pine Script v6):</b> OBV + MA (فلترة السيولة) | ZigZag Depth (القمم والقيعان) | BOS & CHoCH (هيكل السوق) | OB & FVG (الأوردر بلوك والفجوات).
-</div>
-""", unsafe_allow_html=True)
-
-tv_symbol = "OANDA:XAUUSD" if "XAUUSD" in asset else ("OANDA:XAGUSD" if "XAGUSD" in asset else "BINANCE:BTCUSDT")
+# منصة TradingView
+st.markdown("### 📊 منصة TradingView")
+tv_symbol = assets_dict[asset]["tv"]
 tv_html = f"""
-<div class="tradingview-widget-container" style="height:320px;width:100%;">
+<div class="tradingview-widget-container" style="height:300px;width:100%;">
   <div id="tradingview_widget" style="height:100%;width:100%"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
   new TradingView.widget({{
-    "width": "100%", "height": 320, "symbol": "{tv_symbol}", "interval": "5",
+    "width": "100%", "height": 300, "symbol": "{tv_symbol}", "interval": "5",
     "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "ar",
     "toolbar_bg": "#f1f3f6", "enable_publishing": false, "allow_symbol_change": true,
     "container_id": "tradingview_widget"
@@ -171,52 +179,51 @@ tv_html = f"""
   </script>
 </div>
 """
-st.components.v1.html(tv_html, height=330)
+st.components.v1.html(tv_html, height=310)
 
 st.divider()
 
-# حاسبة المخاطر وإدارة الأهداف (أفقية ومضغوطة)
-st.markdown("### 🧮 حاسبة المخاطر والأهداف الأربعة")
-sl = current_price - 10.00
-tp1 = current_price + 5.00
-tp2 = current_price + 10.00
-tp3 = current_price + 15.00
-tp4 = current_price + 20.00
-
-m1, m2, m3 = st.columns(3)
-m1.metric("دخول (Entry)", f"{current_price:.2f}")
-m2.metric("وقف (SL -10$)", f"{sl:.2f}")
-m3.metric("الهدف النهائي (20$)", f"{tp4:.2f}")
-
-c1, c2, c3, c4 = st.columns(4)
-c1.info(f"TP1 (+5$)\n{tp1:.2f}")
-c2.info(f"TP2 (+10$)\n{tp2:.2f}")
-c3.info(f"TP3 (+15$)\n{tp3:.2f}")
-c4.info(f"TP4 (+20$)\n{tp4:.2f}")
-
-st.info("🛡️ **التأمين:** يتم نقل الستوب لنقطة الدخول فور تحقيق الهدف الأول (+5$) لحجز الأرباح.")
-
-st.divider()
-
-# وظيفة إرسال الرسائل إلى تيليجرام
-def send_tg(text):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}
-    try:
-        res = requests.post(url, json=payload, timeout=10)
-        if res.json().get("ok"):
-            st.success("✅ تم الإرسال للقناة!")
-        else:
-            st.error("❌ فشل الإرسال.")
-    except Exception as e:
-        st.error(f"❌ خطأ: {e}")
-
-# أزرار التحكم وإرسال التنبيهات (مصفوفة أفقية متجاورة بالكامل)
+# 🔒 قسم الصفقات وتحليل المخاطر (مخفي للزوار في وضع المعاينة ويظهر للمالك فقط)
 if st.session_state.authenticated:
+    st.markdown("### 🧮 حاسبة المخاطر والأهداف الأربعة (خاص بالمالك)")
+    sl = current_price - 10.00
+    tp1 = current_price + 5.00
+    tp2 = current_price + 10.00
+    tp3 = current_price + 15.00
+    tp4 = current_price + 20.00
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("دخول", f"{current_price:.2f}")
+    m2.metric("وقف (-10$)", f"{sl:.2f}")
+    m3.metric("الهدف النهائي (20$)", f"{tp4:.2f}")
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.info(f"TP1 (+5$)\n{tp1:.2f}")
+    c2.info(f"TP2 (+10$)\n{tp2:.2f}")
+    c3.info(f"TP3 (+15$)\n{tp3:.2f}")
+    c4.info(f"TP4 (+20$)\n{tp4:.2f}")
+
+    st.info("🛡️ **التأمين:** يتم نقل الستوب لنقطة الدخول فور تحقيق الهدف الأول (+5$).")
+
+    st.divider()
+
+    # وظيفة إرسال الرسائل إلى تيليجرام
+    def send_tg(text):
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}
+        try:
+            res = requests.post(url, json=payload, timeout=10)
+            if res.json().get("ok"):
+                st.success("✅ تم الإرسال للقناة!")
+            else:
+                st.error("❌ فشل الإرسال.")
+        except Exception as e:
+            st.error(f"❌ خطأ: {e}")
+
+    # أزرار التحكم وإرسال التنبيهات (أفقية متجاورة بالكامل)
     st.markdown("### 🚀 أزرار التحكم وإرسال التنبيهات (أفقية)")
 
     b_col1, b_col2, b_col3, b_col4 = st.columns(4)
-    
     with b_col1:
         if st.button("إرسال الدخول 🚀"):
             msg = (
@@ -228,37 +235,36 @@ if st.session_state.authenticated:
                 f"📌 <b>الأهداف (مجموع 20$):</b>\n"
                 f"▪️ TP1 (+5$): <code>{tp1:.2f}</code> | ▪️ TP2 (+10$): <code>{tp2:.2f}</code>\n"
                 f"▪️ TP3 (+15$): <code>{tp3:.2f}</code> | ▪️ TP4 (+20$): <code>{tp4:.2f}</code>\n\n"
-                f"🛡️ <i>تأمين الصفقة ونقل الستوب للبريك إيفن بعد TP1 (+5$)</i>\n"
+                f"🛡️ <i>تأمين الصفقة بعد TP1 (+5$)</i>\n"
                 f"👑 <i>GOLDRIDER & RAZAKE TRADING</i>"
             )
             send_tg(msg)
 
     with b_col2:
         if st.button("اختبار 🧪"):
-            send_tg(f"🧪 <b>اختبار نظام التوصيات والأهداف</b>\n🔹 <b>الزوج:</b> {asset}\n🎯 <b>الدخول:</b> <code>{current_price:.2f}</code>\n✅ الاتصال يعمل بكفاءة.")
+            send_tg(f"🧪 <b>اختبار النظام</b>\n🔹 <b>الزوج:</b> {asset}\n🎯 <b>السعر:</b> <code>{current_price:.2f}</code>")
 
     with b_col3:
         if st.button("إغلاق يدوي 🔒"):
-            send_tg(f"🔒 <b>إغلاق يدوي للصفقة</b>\n🔹 <b>الزوج:</b> {asset}\n⚠️ تم إغلاق الصفقة يدوياً لحجز الأرباح.")
+            send_tg(f"🔒 <b>إغلاق يدوي</b>\n🔹 <b>الزوج:</b> {asset}")
 
     with b_col4:
         if st.button("ضرب الاستوب 🛑"):
-            send_tg(f"🛑 <b>تنبيه: ضرب وقف الخسارة (-10$)</b>\n🔹 <b>الزوج:</b> {asset}\n⚠️ الخروج بحماية رأس المال.")
+            send_tg(f"🛑 <b>تنبيه وقف الخسارة (-10$)</b>\n🔹 <b>الزوج:</b> {asset}")
 
-    st.markdown("#### 💥 أزرار إشعارات الـ BOOM (أفقية)")
+    st.markdown("#### 💥 أزرار الـ BOOM (أفقية)")
     p1, p2, p3, p4 = st.columns(4)
-    
     with p1:
         if st.button("BOOM TP1 💥"):
-            send_tg(f"💥 <b>BOOM! تحقيق الهدف 1 بنجاح!</b> 🎯\n🔹 {asset} | السعر: <code>{tp1:.2f}</code> | الربح: +5$\n🛡️ <b>تم تفعيل التأمين وحجز الأرباح</b>")
+            send_tg(f"💥 <b>تحقيق الهدف 1!</b> 🎯\n🔹 {asset} | السعر: <code>{tp1:.2f}</code> | الربح: +5$\n🛡️ <b>تم تفعيل التأمين</b>")
     with p2:
         if st.button("BOOM TP2 💥"):
-            send_tg(f"💥 <b>BOOM! تحقيق الهدف 2 بنجاح!</b> 🎯\n🔹 {asset} | السعر: <code>{tp2:.2f}</code> | الربح: +10$")
+            send_tg(f"💥 <b>تحقيق الهدف 2!</b> 🎯\n🔹 {asset} | السعر: <code>{tp2:.2f}</code> | الربح: +10$")
     with p3:
         if st.button("BOOM TP3 💥"):
-            send_tg(f"💥 <b>BOOM! تحقيق الهدف 3 بنجاح!</b> 🎯\n🔹 {asset} | السعر: <code>{tp3:.2f}</code> | الربح: +15$")
+            send_tg(f"💥 <b>تحقيق الهدف 3!</b> 🎯\n🔹 {asset} | السعر: <code>{tp3:.2f}</code> | الربح: +15$")
     with p4:
         if st.button("BOOM TP4 💥"):
-            send_tg(f"💥 <b>BOOM! تحقيق الهدف 4 والأخير!</b> 🎯\n🔹 {asset} | السعر: <code>{tp4:.2f}</code> | إجمالي الربح: +20$")
+            send_tg(f"💥 <b>تحقيق الهدف 4 والأخير!</b> 🎯\n🔹 {asset} | السعر: <code>{tp4:.2f}</code> | الإجمالي: +20$")
 else:
-    st.warning("🔒 أزرار إرسال التوصيات والصعقات مخفية في وضع المعاينة المجانية. سجل الدخول برمز المالك للتحكم.")
+    st.info("🔒 **حاسبة الصفقات وأزرار الإرسال مخفية في وضع المعاينة المجانية.** تظهر هذه الخيارات حصرياً لمالك البوت بعد تسجيل الدخول بررمز المرور.")
