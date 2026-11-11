@@ -103,7 +103,7 @@ st.markdown("<h3 style='margin-top: 15px;'>👑 عروض الاشتراك في �
 # تذكير بوضع المعاينة النشطة إن وجد
 if st.session_state.preview_start and not st.session_state.authenticated:
     remaining = int(300 - (time.time() - st.session_state.preview_start))
-    st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث. (الصفقات وأزرار الإرسال مخفية في وضع المعاينة)")
+    st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث. (التحليلات والصفقات مخفية في وضع المعاينة)")
 
 # نبذة تعريفية ومميزات القناة
 with st.expander("📌 مميزات القناة والأصول المتاحة"):
@@ -144,7 +144,7 @@ with l_col3:
 
 st.divider()
 
-# خريطة الأصول المستخرجة من صورتك مع رموز TradingView
+# خريطة الأصول المستخرجة مع رموز TradingView
 assets_dict = {
     "BTCUSD (بتكوين / دولار أمريكي)": {"tv": "BINANCE:BTCUSDT", "price": 74445.0},
     "GOLD (الذهب / دولار أمريكي / أونصة)": {"tv": "OANDA:XAUUSD", "price": 3996.99},
@@ -168,47 +168,48 @@ with col_a2:
 
 st.divider()
 
-# خاصية تحليل السوق وتحليل الصفقة (أفقية ومضغوطة)
-st.markdown("### 🔍 تحليل السوق وتحليل الصفقة")
-col_ana1, col_ana2 = st.columns(2)
-with col_ana1:
-    market_trend = st.selectbox("الاتجاه العام:", ["صاعد قوي (Bullish)", "هابط قوي (Bearish)", "عرضي (Consolidation)"])
-with col_ana2:
-    strategy_mode = st.selectbox("استراتيجية الدخول:", ["SMC & Order Block", "العرض والطلب", "كلاسيكي ودعوم"])
-
-ana_btn1, ana_btn2 = st.columns(2)
-with ana_btn1:
-    if st.button("📊 فحص السوق"):
-        st.success(f"✅ الاتجاه ({market_trend}) يدعم الصفقات إيجابياً.")
-with ana_btn2:
-    if st.button("🔬 فحص الصفقة"):
-        st.info(f"🔍 نسبة المخاطرة ممتازة مع اللوت ({st.session_state.lot_val}).")
-
-st.divider()
-
-# منصة TradingView
+# 📊 منصة TradingView في الجهة العلوية مع كافة الأدوات والمؤشرات والفريمات
 st.markdown("### 📊 منصة TradingView")
 tv_symbol = assets_dict[asset]["tv"]
 tv_html = f"""
-<div class="tradingview-widget-container" style="height:300px;width:100%;">
+<div class="tradingview-widget-container" style="height:380px;width:100%;">
   <div id="tradingview_widget" style="height:100%;width:100%"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
   new TradingView.widget({{
-    "width": "100%", "height": 300, "symbol": "{tv_symbol}", "interval": "5",
+    "width": "100%", "height": 380, "symbol": "{tv_symbol}", "interval": "5",
     "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "ar",
     "toolbar_bg": "#f1f3f6", "enable_publishing": false, "allow_symbol_change": true,
+    "save_image": true, "details": true, "hotlist": true, "calendar": true,
+    "studies": ["MASimple@tv-basicstudies", "RSI@tv-basicstudies", "MACD@tv-basicstudies"],
     "container_id": "tradingview_widget"
   }});
   </script>
 </div>
 """
-st.components.v1.html(tv_html, height=310)
+st.components.v1.html(tv_html, height=390)
 
 st.divider()
 
-# 🔒 قسم الصفقات وتحليل المخاطر واختبار قناة التليجرام (مخفي للزوار ويظهر للمالك فقط)
+# 🔒 خاصية تحليل السوق وتحليل الصفقة (مخفية للزوار وتظهر حصرياً لمالك البوت)
 if st.session_state.authenticated:
+    st.markdown("### 🔍 تحليل السوق وتحليل الصفقة (خاص بالمالك)")
+    col_ana1, col_ana2 = st.columns(2)
+    with col_ana1:
+        market_trend = st.selectbox("الاتجاه العام:", ["صاعد قوي (Bullish)", "هابط قوي (Bearish)", "عرضي (Consolidation)"])
+    with col_ana2:
+        strategy_mode = st.selectbox("استراتيجية الدخول:", ["SMC & Order Block", "العرض والطلب", "كلاسيكي ودعوم"])
+
+    ana_btn1, ana_btn2 = st.columns(2)
+    with ana_btn1:
+        if st.button("📊 فحص السوق"):
+            st.success(f"✅ الاتجاه ({market_trend}) يدعم الصفقات إيجابياً.")
+    with ana_btn2:
+        if st.button("🔬 فحص الصفقة"):
+            st.info(f"🔍 نسبة المخاطرة ممتازة مع اللوت ({st.session_state.lot_val}).")
+
+    st.divider()
+
     st.markdown("### 🧮 حاسبة المخاطر والأهداف الأربعة (خاص بالمالك)")
     sl = current_price - 10.00
     tp1 = current_price + 5.00
@@ -298,4 +299,4 @@ if st.session_state.authenticated:
         if st.button("BOOM TP4 💥"):
             send_tg(f"💥 <b>BOOM! تحقيق الهدف 4 والأخير!</b> 🎯\n🔹 {asset} | السعر: <code>{tp4:.2f}</code> | الإجمالي: +20$")
 else:
-    st.info("🔒 **حاسبة الصفقات وأزرار الإرسال واختبار القناة مخفية في وضع المعاينة المجانية.** تظهر هذه الخيارات حصرياً لمالك البوت بعد تسجيل الدخول بررمز المرور.")
+    st.info("🔒 **تحليل السوق، حاسبة الصفقات، أزرار الإرسال واختبار القناة مخفية في وضع المعاينة المجانية.** تظهر هذه الخيارات حصرياً لمالك البوت بعد تسجيل الدخول بررمز المرور.")
