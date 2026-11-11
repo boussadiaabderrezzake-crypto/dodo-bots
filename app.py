@@ -116,17 +116,23 @@ def get_price(symbol="XAUUSD"):
     return 4047.90  # سعر احتياطي
 
 # ==========================================
-# 5. فتح صفقة + إشعار للتيليجرام
+# 5. فتح صفقة + إشعار للتيليجرام بالشكل المطلوب
 # ==========================================
 def open_trade(side="BUY", lot=0.01):
     price = get_price()
     
     if side == "BUY":
         sl = price - 5.0
-        tp1, tp2, tp3, tp4 = price + 5.0, price + 10.0, price + 15.0, price + 20.0
+        tp1 = price + 5.0
+        tp2 = price + 10.0
+        tp3 = price + 15.0
+        tp4 = price + 20.0
     else:
         sl = price + 5.0
-        tp1, tp2, tp3, tp4 = price - 5.0, price - 10.0, price - 15.0, price - 20.0
+        tp1 = price - 5.0
+        tp2 = price - 10.0
+        tp3 = price - 15.0
+        tp4 = price - 20.0
     
     st.session_state.open_trades["XAUUSD"] = {
         "side": side, "entry": price, "lot": lot, "sl": sl,
@@ -136,13 +142,24 @@ def open_trade(side="BUY", lot=0.01):
     }
     
     emoji = "🟢" if side == "BUY" else "🔴"
-    msg = f"🌟 *GOLDRIDER AI*\n{emoji} *صفقة {side}* على XAUUSD\n"
-    msg += f"💰 *الدخول:* `{price:.2f}`\n🛑 *الستوب:* `{sl:.2f}`\n"
-    msg += f"🎯 *TP1:* `{tp1:.2f}`\n🎯 *TP2:* `{tp2:.2f}`\n"
-    msg += f"🎯 *TP3:* `{tp3:.2f}`\n🏆 *TP4:* `{tp4:.2f}`\n"
-    msg += f"📊 *اللوت:* `{lot}`"
+    
+    # القالب الجديد المطلوب بحذافيره
+    msg = (
+        f"🌟 *GOLDRIDER AI & SMC Confluence* 🌟\n"
+        f"👨‍💻 *RAZAKE TRADING* | توصية جديدة على الذهب\n\n"
+        f"{emoji} *النوع:* {side} (Gold (XAUUSD))\n"
+        f"💰 *سعر الدخول:* `{price:.2f}`\n"
+        f"🛑 *وقف الخسارة (SL):* `{sl:.2f}` (-5 دولار)\n"
+        f"🎯 *الهدف الأول (TP1):* `{tp1:.2f}` (+5 دولار)\n"
+        f"🎯 *الهدف الثاني (TP2):* `{tp2:.2f}` (+10 دولار)\n"
+        f"🎯 *الهدف الثالث (TP3):* `{tp3:.2f}` (+15 دولار)\n"
+        f"🎯 *الهدف الرابع (TP4):* `{tp4:.2f}` (+20 دولار)\n\n"
+        f"📊 *التحليل:* تأكيد السيولة المؤسسية واختراق الهيكل (BOS).\n"
+        f"📊 *حجم اللوت:* `{lot}`"
+    )
+    
     send_telegram(msg)
-    st.success(f"✅ تم فتح صفقة {side} على XAUUSD @ {price:.2f}")
+    st.success(f"✅ تم فتح صفقة {side} على XAUUSD وإرسال التنبيه للقناة بنجاح @ {price:.2f}")
 
 # ==========================================
 # 6. تحديث الصفقة ومتابعة الأهداف
