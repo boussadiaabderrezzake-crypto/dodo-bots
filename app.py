@@ -12,10 +12,9 @@ import streamlit.components.v1 as components
 # ==========================================
 st.set_page_config(page_title="SMART TRADING AI", layout="wide", initial_sidebar_state="expanded")
 
-# ⚠️ التوكن والآي دي الجدد (تم التحديث)
 TOKEN = "9206676062:AAHkdzTn8zCbk2Of4gmGbr6GvyBasER1gOw"
 CHAT_ID = "-1003911614530"
-ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD")
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "01111989")
 
 if not TOKEN or not CHAT_ID:
     st.error("❌ التوكن أو الـ ID غير موجودين!")
@@ -25,9 +24,10 @@ def send_telegram(msg: str):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"}
     try:
-        requests.post(url, data=payload, timeout=10)
+        r = requests.post(url, data=payload, timeout=10)
+        return r.status_code == 200
     except Exception as e:
-        pass
+        return False
 
 # ==========================================
 # 2. حالة التطبيق
@@ -41,6 +41,12 @@ if "last_analysis" not in st.session_state:
 
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
+
+# ✅ متغير جديد: تتبع حالة التداول التلقائي
+if "auto_trade_enabled" not in st.session_state:
+    st.session_state.auto_trade_enabled = False
+if "last_auto_check" not in st.session_state:
+    st.session_state.last_auto_check = None
 
 LOT_VALUES = [
     0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09,
@@ -263,6 +269,28 @@ def close_trade_manually(symbol):
         del open_trades[symbol]
 
 # ==========================================
+# ✅ 7.1 التداول التلقائي (جديد)
+# ==========================================
+def auto_scan_markets():
+    """يفحص السوق تلقائياً ويفتح الصفقات عند توفر الفرصة (جودة ≥ 4)"""
+    results = []
+    market_list = [
+        ("XAU", "Gold (XAUUSD)", "metal"),
+        ("BTCUSDT", "BTC/USDT", "crypto"),
+        ("ETHUSDT", "ETH/USDT", "crypto"),
+    ]
+    for sym, nm, src in market_list:
+        if sym in open_trades:
+            continue
+        try:
+            res = execute_analysis(sym, nm, src, "5m", st.session_state.selected_lot)
+            if res and res.get("trend") not in [None, "NEUTRAL"] and "error" not in res:
+                results.append(res)
+        except:
+            continue
+    return results
+
+# ==========================================
 # 8. الواجهة
 # ==========================================
 algeria_tz = pytz.timezone('Africa/Algiers')
@@ -385,6 +413,7 @@ with col_center:
     tf_selected = st.selectbox("اختر الفريم الزمني:", list(timeframes.keys()), index=1)
     tv_timeframe = tv_timeframes[timeframes[tf_selected]]
 
+    # ✅ شارت TradingView مع أدوات الرسم والمؤشرات (جديد)
     tv_html = f"""
     <div id="tv_chart_container"></div>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
@@ -393,6 +422,10 @@ with col_center:
       "width": "100%", "height": 600, "symbol": "{tv_symbol}",
       "interval": "{tv_timeframe}", "timezone": "Africa/Algiers",
       "theme": "dark", "style": "1", "locale": "ar",
+      "toolbar_bg": "#0e1726", "enable_publishing": false, "allow_symbol_change": true,
+      "save_image": true, "details": true, "hotlist": true, "calendar": true,
+      "hide_side_toolbar": false, "withdateranges": true,
+      "studies": ["MASimple@tv-basicstudies", "RSI@tv-basicstudies", "MACD@tv-basicstudies", "BB@tv-basicstudies"],
       "container_id": "tv_chart_container"
     }});
     </script>
@@ -416,7 +449,31 @@ with col_right:
     if st.session_state.is_admin:
         st.success("🔓 مرحباً بك يا مالك البوت")
         
-        if st.button("🚀 تحليل السوق", use_container_width=True):
+        # ✅ زر اختبار القناة (جديد)
+        if st.button("📤 اختبار القناة (إرسال رسالة)", use_container_width=True):
+            ok = send_telegram("🤖 *رسالة اختبار من البوت*\n✅ القناة متصلة بنجاح!")
+            if ok:
+                st.success("✅ تم إرسال رسالة الاختبار للقناة!")
+            else:
+                st.error("❌ فشل الإرسال. تحقق من التوكن والآي دي.")
+
+        # ✅ زر التداول التلقائي (جديد)
+        if st.button("🤖 تشغيل/إيقاف التداول التلقائي", use_container_width=True):
+            st.session_state.auto_trade_enabled = not st.session_state.auto_trade_enabled
+            status = "مُفعّل ✅" if st.session_state.auto_trade_enabled else "مُعطّل ❌"
+            st.success(f"التداول التلقائي: {status}")
+        
+        # ✅ إذا التداول التلقائي مفعل، يفحص السوق عند كل ضغطة
+        if st.session_state.auto_trade_enabled:
+            if st.button("🔍 فحص السوق الآن (تلقائي)", use_container_width=True):
+                with st.spinner("جاري فحص السوق..."):
+                    new_trades = auto_scan_markets()
+                    if new_trades:
+                        st.success(f"✅ تم فتح {len(new_trades)} صفقة جديدة!")
+                    else:
+                        st.info("لا توجد فرص حالياً (السوق متذبذب).")
+
+        if st.button("🚀 تحليل السوق (يدوي)", use_container_width=True):
             with st.spinner("جاري التحليل..."):
                 source = "crypto" if "USDT" in symbol_name else ("metal" if "XAU" in symbol_name else "yahoo")
                 sym = symbol_name if source == "crypto" else ("XAU" if "XAU" in symbol_name else symbol_name)
@@ -430,6 +487,7 @@ with col_right:
                 manage_trades()
                 st.success("✅ تم تحديث الصفقات!")
 
+        # عرض نتيجة آخر تحليل
         if st.session_state.last_analysis:
             res = st.session_state.last_analysis
             if "error" in res:
