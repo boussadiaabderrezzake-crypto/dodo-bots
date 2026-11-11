@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# تخصيص التصميم وتصغير أحجام الخطوط والعناصر، وإخفاء زر إدارة التطبيق (Manage app) عن الزوار
+# تخصيص التصميم وتصغير أحجام الخطوط والعناصر، وإخفاء زر إدارة التطبيق (Manage app) للزوار
 st.markdown("""
 <style>
     .stApp { background-color: #080c14; color: #e2e8f0; font-size: 11px; }
@@ -40,15 +40,15 @@ if 'authenticated' not in st.session_state:
 if 'preview_start' not in st.session_state:
     st.session_state.preview_start = None
 
-# إخفاء قائمة وطتوثيق "Manage app" عن الزوار عبر CSS إضافي إن لم يكونوا مالكين
+# إخفاء قائمة وطتوثيق "Manage app" وفريق العمل عن الزوار عبر CSS إضافي إن لم يكونوا مالكين
 if not st.session_state.authenticated:
     st.markdown("""
     <style>
-        [data-testid="stStatusWidget"], footer, #MainMenu {visibility: hidden; display: none;}
+        [data-testid="stStatusWidget"], footer, #MainMenu, header {visibility: hidden; display: none;}
     </style>
     """, unsafe_allow_html=True)
 
-# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية بدقة تامة)
+# التحقق من انتهاء وقت المعاينة المجانية (5 دقائق = 300 ثانية)
 if st.session_state.preview_start and not st.session_state.authenticated:
     elapsed = time.time() - st.session_state.preview_start
     if elapsed > 300:
@@ -56,8 +56,8 @@ if st.session_state.preview_start and not st.session_state.authenticated:
         st.warning("⏰ انتهت فترة المعاينة المجانية (5 دقائق). يرجى إدخال رمز المالك للمتابعة.")
         st.rerun()
 
-# شاشة حظر الدخول المباشر وتسجيل الدخول بكلمة السر السرية
-if not st.session_state.authenticated and not st.session_state.preview_start:
+# شاشة حظر الدخول المباشر وتسجيل الدخول بكلمة السر السرية (تظهر فقط إذا لم يتم تسجيل الدخول ولم تبتدئ المعاينة)
+if not st.session_state.authenticated and st.session_state.preview_start is None:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("<h2>🔐 منطقة محمية - GOLDRIDER VIP</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 11px;'>المنطقة محمية لمالك البوت حصراً. يرجى إدخال رمز التحقق أو البدء بمعاينة مجانية.</p>", unsafe_allow_html=True)
@@ -109,14 +109,12 @@ with col_btn2:
 
 st.markdown("<h3 style='margin-top: 15px;'>👑 عروض الاشتراك في قناة VIP 👑</h3>", unsafe_allow_html=True)
 
-# تذكير بوضع المعاينة النشطة إن وجد مع عداد تنازلي دقيق
+# تنبيه وقت المعاينة المجانية إن وجد
 if st.session_state.preview_start and not st.session_state.authenticated:
     elapsed_time = time.time() - st.session_state.preview_start
     remaining = int(300 - elapsed_time)
     if remaining > 0:
-        st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث. (التحليلات والصفقات مخفية في وضع المعاينة)")
-        time.sleep(1)
-        st.rerun()
+        st.info(f"⏳ معاينة مجانية متبقي: {remaining // 60}د و {remaining % 60}ث. (البوت يعمل بكامل واجهته وشارته للزوار)")
     else:
         st.session_state.preview_start = None
         st.rerun()
@@ -133,7 +131,7 @@ with st.expander("📌 مميزات القناة والأصول المتاحة")
 
 st.divider()
 
-# حاسبة إدارة اللوت (أزرار أفقية صغيرة ومتجاورة)
+# حاسبة إدارة اللوت (أزرار أفقية صغيرة ومتجاورة متاحة للجميع)
 st.markdown("### 🎛️ تحكم بحجم اللوت (Lot Size)")
 if 'lot_val' not in st.session_state:
     st.session_state.lot_val = 0.01
@@ -184,7 +182,7 @@ with col_a2:
 
 st.divider()
 
-# 📊 منصة TradingView في الجهة العلوية مع كافة الأدوات والمؤشرات والفريمات
+# 📊 منصة TradingView في الجهة العلوية مرئية للجميع
 st.markdown("### 📊 منصة TradingView")
 tv_symbol = assets_dict[asset]["tv"]
 tv_html = f"""
@@ -207,46 +205,32 @@ st.components.v1.html(tv_html, height=390)
 
 st.divider()
 
-# 🔒 خاصية تحليل السوق وتحليل الصفقة (مخفية للزوار وتظهر حصرياً لمالك البوت)
+# 🧮 حاسبة الأهداف ومخاطر السوق (تظهر للجميع لمعاينة كفاءة البوت)
+st.markdown("### 🧮 حاسبة المخاطر والأهداف الأربعة")
+sl = current_price - 10.00
+tp1 = current_price + 5.00
+tp2 = current_price + 10.00
+tp3 = current_price + 15.00
+tp4 = current_price + 20.00
+
+m1, m2, m3 = st.columns(3)
+m1.metric("دخول", f"{current_price:.2f}")
+m2.metric("وقف (-10$)", f"{sl:.2f}")
+m3.metric("الهدف النهائي (20$)", f"{tp4:.2f}")
+
+c1, c2, c3, c4 = st.columns(4)
+c1.info(f"TP1 (+5$)\n{tp1:.2f}")
+c2.info(f"TP2 (+10$)\n{tp2:.2f}")
+c3.info(f"TP3 (+15$)\n{tp3:.2f}")
+c4.info(f"TP4 (+20$)\n{tp4:.2f}")
+
+st.info("🛡️ **التأمين:** يتم نقل الستوب لنقطة الدخول فور تحقيق الهدف الأول (+5$).")
+
+st.divider()
+
+# 🚀 أدوات وإرسال التنبيهات (تظهر حصرياً لمالك البوت بعد تسجيل الدخول بررمز المرور)
 if st.session_state.authenticated:
-    st.markdown("### 🔍 تحليل السوق وتحليل الصفقة (خاص بالمالك)")
-    col_ana1, col_ana2 = st.columns(2)
-    with col_ana1:
-        market_trend = st.selectbox("الاتجاه العام:", ["صاعد قوي (Bullish)", "هابط قوي (Bearish)", "عرضي (Consolidation)"])
-    with col_ana2:
-        strategy_mode = st.selectbox("استراتيجية الدخول:", ["SMC & Order Block", "العرض والطلب", "كلاسيكي ودعوم"])
-
-    ana_btn1, ana_btn2 = st.columns(2)
-    with ana_btn1:
-        if st.button("📊 فحص السوق"):
-            st.success(f"✅ الاتجاه ({market_trend}) يدعم الصفقات إيجابياً.")
-    with ana_btn2:
-        if st.button("🔬 فحص الصفقة"):
-            st.info(f"🔍 نسبة المخاطرة ممتازة مع اللوت ({st.session_state.lot_val}).")
-
-    st.divider()
-
-    st.markdown("### 🧮 حاسبة المخاطر والأهداف الأربعة (خاص بالمالك)")
-    sl = current_price - 10.00
-    tp1 = current_price + 5.00
-    tp2 = current_price + 10.00
-    tp3 = current_price + 15.00
-    tp4 = current_price + 20.00
-
-    m1, m2, m3 = st.columns(3)
-    m1.metric("دخول", f"{current_price:.2f}")
-    m2.metric("وقف (-10$)", f"{sl:.2f}")
-    m3.metric("الهدف النهائي (20$)", f"{tp4:.2f}")
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.info(f"TP1 (+5$)\n{tp1:.2f}")
-    c2.info(f"TP2 (+10$)\n{tp2:.2f}")
-    c3.info(f"TP3 (+15$)\n{tp3:.2f}")
-    c4.info(f"TP4 (+20$)\n{tp4:.2f}")
-
-    st.info("🛡️ **التأمين:** يتم نقل الستوب لنقطة الدخول فور تحقيق الهدف الأول (+5$).")
-
-    st.divider()
+    st.markdown("### 🚀 أزرار التحكم وإرسال التنبيهات واختبار القناة (خاص بالمالك)")
 
     # وظيفة إرسال الرسائل إلى تيليجرام
     def send_tg(text):
@@ -260,9 +244,6 @@ if st.session_state.authenticated:
                 st.error("❌ فشل الإرسال.")
         except Exception as e:
             st.error(f"❌ خطأ: {e}")
-
-    # أزرار التحكم وإرسال التنبيهات واختبار القناة (أفقية متجاورة)
-    st.markdown("### 🚀 أزرار التحكم وإرسال التنبيهات واختبار القناة")
 
     b_col1, b_col2, b_col3, b_col4 = st.columns(4)
     with b_col1:
@@ -315,4 +296,4 @@ if st.session_state.authenticated:
         if st.button("BOOM TP4 💥"):
             send_tg(f"💥 <b>BOOM! تحقيق الهدف 4 والأخير!</b> 🎯\n🔹 {asset} | السعر: <code>{tp4:.2f}</code> | الإجمالي: +20$")
 else:
-    st.info("🔒 **تحليل السوق، حاسبة الصفقات، أزرار الإرسال واختبار القناة مخفية في وضع المعاينة المجانية.** تظهر هذه الخيارات حصرياً لمالك البوت بعد تسجيل الدخول بررمز المرور.")
+    st.info("🔒 **أزرار إرسال التنبيهات وقناة التليجرام مخصصة لمالك البوت حصراً.** يمكنك تسجيل الدخول باستخدام رمز المرور الخاص بك في أعلى الصفحة للتحكم الكامل.")
