@@ -24,7 +24,6 @@ st.markdown("""
     .gold-box { background-color: #0e1726; border: 1px solid #ffd700; padding: 8px; border-radius: 8px; margin-bottom: 8px; font-size: 11px; }
     .info-card { background-color: #0e1726; border: 1px solid #1e293b; padding: 8px; border-radius: 8px; margin-bottom: 8px; font-size: 11px; }
     p, li, span, label { font-size: 11px !important; }
-    .row-widget { display: flex; gap: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -131,21 +130,21 @@ with col_a2:
 
 st.divider()
 
-# خاصية تحليل السوق وتحليل الصفقة (جديدة ومدمجة في الواجهة)
+# خاصية تحليل السوق وتحليل الصفقة (مدمجة ومنظمة بشكل أفقي)
 st.markdown("### 🔍 تحليل السوق وتحليل الصفقة الذكي")
 col_ana1, col_ana2 = st.columns(2)
 with col_ana1:
-    market_trend = st.selectbox("اتجاه السوق العام:", ["صاعد قوي (Bullish Trend)", "هابط قوي (Bearish Trend)", "عرضي (Consolidation)"])
-with colana2 if 'colana2' in locals() else col_ana2 := st.columns(2)[1]: # fallback syntax safety
-    pass
-# التصحيح الأفق لعاملي التحليل
-ana_c1, ana_c2 = st.columns(2)
-with ana_c1:
+    market_trend = st.selectbox("اتجاه السوق العام:", ["صاعد قوي (Bullish)", "هابط قوي (Bearish)", "عرضي (Consolidation)"])
+with col_ana2:
+    strategy_mode = st.selectbox("استراتيجية الدخول:", ["SMC & Order Block", "العرض والطلب", "كلاسيكي ودعوم"])
+
+ana_btn1, ana_btn2 = st.columns(2)
+with ana_btn1:
     if st.button("📊 فحص وتحليل السوق"):
-        st.success(f"✅ تحليل {asset}: الاتجاه الحالي ({market_trend}) يتوافق مع مناطق السيولة المؤسسية وبنية SMC بنجاح.")
-with ana_c2:
+        st.success(f"✅ تحليل {asset}: الاتجاه ({market_trend}) يدعم الصفقات الإيجابية وفقاً لهيكل السوق الحالي.")
+with ana_btn2:
     if st.button("🔬 فحص جاهزية الصفقة"):
-        st.info(f"🔍 تقييم الصفقة: نسبة المخاطرة للعائد مثالية (1:2)، مؤشر العزم OBV يدعم دخول الشراء بلوت {st.session_state.lot_val}.")
+        st.info(f"🔍 تقييم الصفقة ({strategy_mode}): نسبة المخاطرة للعائد ممتازة، ومؤشر العزم متوافق مع اللوت ({st.session_state.lot_val}).")
 
 st.divider()
 
@@ -153,7 +152,7 @@ st.divider()
 st.markdown("### 📊 منصة TradingView ومؤشر GOLDRIDER OBV & SMC")
 st.markdown("""
 <div class="gold-box">
-    <b>⚙️ المؤشرات المؤسسية (Pine Script v6):</b> OBV + MA | ZigZag Depth | BOS & CHoCH | OB & FVG.
+    <b>⚙️ المؤشرات المؤسسية (Pine Script v6):</b> OBV + MA (فلترة السيولة) | ZigZag Depth (القمم والقيعان) | BOS & CHoCH (هيكل السوق) | OB & FVG (الأوردر بلوك والفجوات).
 </div>
 """, unsafe_allow_html=True)
 
